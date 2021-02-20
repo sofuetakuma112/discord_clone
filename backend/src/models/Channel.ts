@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
-const channelSchema = new mongoose.Schema({
+export const channelSchema = new mongoose.Schema({
   category_id: mongoose.Schema.Types.ObjectId,
   name: String,
 })
 
-export default mongoose.model('Channel', channelSchema);
+export const channelModel = mongoose.model('Channel', channelSchema);

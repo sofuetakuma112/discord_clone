@@ -1,13 +1,25 @@
 import boom from 'boom';
 
-import Category from '../models/Channel';
+import { channelModel } from '../models/Channel';
 
 // 単一のカテゴリーにおける全てのチャンネルの取得
 export const getChannelsCategory = async (req) => {
   try {
     const id = req.params.id;
-    const channels = await Category.find({ category_id: id });
+    const channels = await channelModel.find({ category_id: id });
     return channels;
+  } catch (error) {
+    throw boom.boomify(error);
+  }
+};
+
+// requestにcategory_idも含める
+export const createNewChannel = async (req) => {
+  try {
+    console.log(req.body);
+    const channel = new channelModel(req.body);
+    const newChannel = await channel.save();
+    return newChannel;
   } catch (error) {
     throw boom.boomify(error);
   }
