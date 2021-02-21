@@ -1,61 +1,63 @@
 <template>
-  <v-app>
-    <v-app-bar
-      app
-      color="primary"
-      dark
-    >
-      <div class="d-flex align-center">
-        <v-img
-          alt="Vuetify Logo"
-          class="shrink mr-2"
-          contain
-          src="https://cdn.vuetifyjs.com/images/logos/vuetify-logo-dark.png"
-          transition="scale-transition"
-          width="40"
-        />
-
-        <v-img
-          alt="Vuetify Name"
-          class="shrink mt-1 hidden-sm-and-down"
-          contain
-          min-width="100"
-          src="https://cdn.vuetifyjs.com/images/logos/vuetify-name-dark.png"
-          width="100"
-        />
-      </div>
-
-      <v-spacer></v-spacer>
-
-      <v-btn
-        href="https://github.com/vuetifyjs/vuetify/releases/latest"
-        target="_blank"
-        text
-      >
-        <span class="mr-2">Latest Release</span>
-        <v-icon>mdi-open-in-new</v-icon>
-      </v-btn>
-    </v-app-bar>
-
-    <v-main>
-      <HelloWorld/>
+  <v-app id="inspire">
+    <Header :greyBackGround="greyBackGround" />
+    <LeftSidebar :darkBackGround="darkBackGround" />
+    <RightSidebar :darkBackGround="darkBackGround" />
+    <v-main :style="greyBackGround">
+      <Chat :greyBackGround="greyBackGround" />
     </v-main>
+    <Footer />
   </v-app>
 </template>
 
 <script lang="ts">
-import Vue from 'vue';
-import HelloWorld from './components/HelloWorld.vue';
+import Vue from 'vue'
+import Header from '@/components/Header.vue'
+import RightSidebar from '@/components/RightSideBar.vue'
+import LeftSidebar from '@/components/LeftSideBar.vue'
+import Chat from '@/components/Chat.vue'
+import Footer from '@/components/Footer.vue'
 
 export default Vue.extend({
-  name: 'App',
-
   components: {
-    HelloWorld,
+    Header,
+    RightSidebar,
+    LeftSidebar,
+    Chat,
+    Footer,
   },
-
-  data: () => ({
-    //
-  }),
+  data() {
+    return {
+      darkBackGround: {
+        background: '#2F3136',
+      },
+      greyBackGround: {
+        background: '#36393f',
+      },
+    };
+  },
 });
 </script>
+
+<style scoped>
+.chat {
+  overflow-y: scroll;
+  max-height: 90vh;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+/*スクロールバーの軌道*/
+::-webkit-scrollbar-track {
+  border-radius: 10px;
+  box-shadow: inset 0 0 6px #202225;
+}
+
+/*スクロールバーの動く部分*/
+::-webkit-scrollbar-thumb {
+  background-color: #202225;
+  border-radius: 10px;
+}
+</style>

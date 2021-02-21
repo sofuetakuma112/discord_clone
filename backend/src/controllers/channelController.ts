@@ -16,7 +16,6 @@ export const getChannelsCategory = async (req) => {
 // requestにcategory_idも含める
 export const createNewChannel = async (req) => {
   try {
-    console.log(req.body);
     const channel = new channelModel(req.body);
     const newChannel = await channel.save();
     return newChannel;
