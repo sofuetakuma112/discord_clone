@@ -4,7 +4,7 @@ import { categoryModel } from '../models/Category';
 
 export const getSingleCategory = async (req) => {
   try {
-    const id = req.params.id;
+    const id = req.params === undefined ? req.id : req.params.id;
     const category = await categoryModel.findById(id);
     return category;
   } catch (error) {
@@ -12,7 +12,7 @@ export const getSingleCategory = async (req) => {
   }
 };
 
-export const getAllCategory = async (req) => {
+export const getAllCategory = async () => {
   try {
     const category = await categoryModel.find();
     return category;

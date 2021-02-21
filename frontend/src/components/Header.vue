@@ -7,7 +7,7 @@
     :style="greyBackGround"
     :elevation="5"
   >
-    <h2 class="white--text">#チャンネル名</h2>
+    <h2 class="white--text">{{ channel.name }}</h2>
     <v-spacer></v-spacer>
 
     <v-responsive max-width="156">
@@ -27,7 +27,8 @@ import Vue from 'vue';
 
 export default Vue.extend({
   props: {
-    greyBackGround: Object
+    greyBackGround: Object,
+    channel: Object,
   },
 });
 </script>

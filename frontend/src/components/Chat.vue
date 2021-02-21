@@ -1,25 +1,23 @@
 <template>
   <div class="chat">
     <v-list two-line :style="greyBackGround">
-      <template v-for="n in 15">
-        <v-list-item :key="n">
+      <template v-for="chat in chats">
+        <v-list-item :key="chat._id">
           <v-list-item-avatar color="grey darken-1">
             <img src="https://randomuser.me/api/portraits/women/81.jpg" />
           </v-list-item-avatar>
 
           <v-list-item-content>
             <v-list-item-title class="white--text"
-              >Message {{ n }}</v-list-item-title
+              >{{ chat.name
+              }}<span class="date">{{ chat.created }}</span></v-list-item-title
             >
 
             <v-list-item-subtitle class="white--text">
-              Lorem ipsum dolor sit amet, consectetur adipisicing elit. Nihil
-              repellendus distinctio similique
+              {{ chat.message }}
             </v-list-item-subtitle>
           </v-list-item-content>
         </v-list-item>
-
-        <v-divider v-if="n !== 6" :key="`divider-${n}`" inset></v-divider>
       </template>
     </v-list>
   </div>
@@ -30,7 +28,8 @@ import Vue from 'vue';
 
 export default Vue.extend({
   props: {
-    greyBackGround: Object
+    greyBackGround: Object,
+    chats: Array,
   },
 });
 </script>
@@ -43,5 +42,10 @@ export default Vue.extend({
 .chat {
   overflow-y: scroll;
   max-height: 90%;
+}
+
+.date {
+  margin-left: 10px;
+  font-size: 12px;
 }
 </style>

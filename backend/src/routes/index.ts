@@ -44,7 +44,7 @@ const routes = [
   {
     method: 'POST' as 'POST',
     url: '/api/chat',
-    handler: chatController.createNewChat
+    handler: chatController.addChat
   }
 ];
 
