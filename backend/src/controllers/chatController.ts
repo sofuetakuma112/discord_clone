@@ -15,12 +15,13 @@ export const getChatsChannel = async (req) => {
 export const addChat = async (req) => {
   try {
     // GraphQLから送信した場合、送信したobjectはreqに入っている
-    const reqest = req.body === undefined ? req : req.body;
+    const request = req.body === undefined ? req : req.body;
     const chatData = {
-      name: reqest.name,
-      message: reqest.message,
+      name: request.name,
+      message: request.message,
       created: new Date(),
-      channel_id: reqest.channel_id,
+      channel_id: request.channel_id,
+      user_id: request.user_id,
     };
     const chat = new chatModel(chatData);
     const newChat = await chat.save();

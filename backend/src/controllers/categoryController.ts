@@ -24,7 +24,8 @@ export const getAllCategory = async () => {
 // カテゴリーの新規追加
 export const createNewCategory = async (req) => {
   try {
-    const category = new categoryModel(req.body);
+    const reqest = req.body === undefined ? req : req.body;
+    const category = new categoryModel(reqest);
     const newCategory = await category.save();
     return newCategory;
   } catch (error) {

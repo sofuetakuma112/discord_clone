@@ -7,7 +7,9 @@
         </v-list-item-avatar>
 
         <v-list-item-content>
-          <v-list-item-title class="grey--text">Jane Smith</v-list-item-title>
+          <v-list-item-title class="grey--text">{{
+            user.name
+          }}</v-list-item-title>
         </v-list-item-content>
       </v-list-item>
     </template>
@@ -16,9 +18,16 @@
 
 <script lang="ts">
 import Vue from 'vue';
+import * as types from '@/types/index.d.ts';
+
 export default Vue.extend({
   props: {
     darkBackGround: Object,
-  }
+  },
+  computed: {
+    user(): types.User {
+      return this.$store.getters.getUser;
+    },
+  },
 });
 </script>

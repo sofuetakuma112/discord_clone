@@ -10,15 +10,21 @@ const server: FastifyInstance<
   logger: true,
 });
 
-server.register(require('fastify-cors'), { 
+server.register(require('fastify-cors'), {
   origin: '*',
   credentials: true,
-})
+});
 
 // DBサーバーの立ち上げ
 mongoose
   .connect('mongodb://localhost/discord_clone')
   .then(() => console.log('MongoDB connected...'))
   .catch((err) => console.log(err));
+
+export const io = require('socket.io')(server.server, {
+  cors: {
+    origin: '*',
+  },
+});
 
 export default server;
