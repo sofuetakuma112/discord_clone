@@ -47,12 +47,36 @@
           @change="onImageChange"
         ></v-file-input>
       </div>
-      <div class="preview-img" v-if="url">
+      <v-dialog v-model="dialog" width="500">
+        <v-card>
+          <v-card-text>
+            <VueCropper
+              v-show="fullImageData"
+              ref="cropper"
+              :src="fullImageData"
+              alt="Source Image"
+            ></VueCropper>
+          </v-card-text>
+          <v-card-actions>
+            <v-btn
+              class="primary"
+              @click="
+                (cropedImage = refs.cropper
+                  .getCroppedCanvas()
+                  .toDataURL()),
+                  (dialog = false)
+              "
+              >Crop</v-btn
+            >
+            <v-btn color="primary" text @click="dialog = false">Cancel</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+      <div class="preview-img" v-if="cropedImage">
         <v-img
           lazy-src="https://picsum.photos/id/11/10/6"
-          max-height="150"
-          max-width="250"
-          :src="url"
+          max-width="350"
+          :src="cropedImage"
         ></v-img>
       </div>
       <div class="error" v-if="errorMessage.length !== 0">
@@ -73,6 +97,8 @@
 <script lang="ts">
 import Vue from 'vue';
 import api from '@/api/index';
+import VueCropper from 'vue-cropperjs';
+import 'cropperjs/dist/cropper.css';
 
 type DataType = {
   name: string;
@@ -80,12 +106,21 @@ type DataType = {
   password: string;
   errorMessage: string;
   img: File | null;
-  url: string;
+  fullImageData: string;
   error: Error | null;
+  mineType: string;
+  cropedImage: string;
+  autoCrop: boolean;
+  image: string;
+  dialog: boolean;
+  files: string;
 };
 
 export default Vue.extend({
   name: 'Register',
+  components: {
+    VueCropper,
+  },
   data(): DataType {
     return {
       name: '',
@@ -93,9 +128,20 @@ export default Vue.extend({
       password: '',
       errorMessage: '',
       img: null,
-      url: '',
+      fullImageData: '',
       error: null,
+      mineType: '',
+      cropedImage: '',
+      autoCrop: false,
+      image: '',
+      dialog: false,
+      files: '',
     };
+  },
+  computed: {
+    refs(): any {
+      return this.$refs;
+    },
   },
   methods: {
     getBase64(file: File) {
@@ -109,9 +155,13 @@ export default Vue.extend({
     onImageChange() {
       if (this.img) {
         this.getBase64(this.img)
-          .then((image) => (this.url = image as string))
+          .then((image) => {
+            this.dialog = true;
+            this.fullImageData = image as string;
+            this.refs.cropper.replace(this.fullImageData);
+          })
           .catch((error: Error) => (this.error = error));
-      } else this.url = '';
+      } else this.cropedImage = '';
     },
     register() {
       api()
@@ -119,7 +169,7 @@ export default Vue.extend({
           name: this.name,
           email: this.email,
           password: this.password,
-          imageConvertedToBase64: this.url,
+          imageConvertedToBase64: this.cropedImage,
         })
         .then((result) => {
           if (result.data.status === 1) {

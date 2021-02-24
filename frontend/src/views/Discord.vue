@@ -114,7 +114,7 @@ import Footer from '@/components/Footer.vue';
 import Modal from '@/components/Modal.vue';
 import ImageModal from '@/components/ImageModal.vue';
 import * as queries from '@/query/index';
-import { io, Socket } from 'socket.io-client';
+// import { io, Socket } from 'socket.io-client';
 import * as types from '@/types/index';
 
 type DataType = {
@@ -134,7 +134,7 @@ type DataType = {
   channelNameInput: string;
   categoryNameInput: string;
   imageFiles: Image[];
-  currentImageFile: Image;
+  currentImageFile: Image | undefined;
   comment: string;
   currentOpeningModalImageData: string;
 };
@@ -256,22 +256,28 @@ export default Vue.extend({
     },
     async uploadImage() {
       this.uploadImageModal = false;
-      // 送信処理
-      await this.$apollo.mutate({
-        mutation: queries.sendMessageMutation,
-        variables: {
-          name: this.user.name,
-          message: this.comment,
-          imageData: this.currentImageFile.imageData,
-          imageTitle: this.currentImageFile.imageTitle,
-          channelId: this.channel.id,
-          userId: this.user._id,
-        },
-      });
-      if (this.imageFiles.length !== 0) {
-        this.currentImageFile = this.imageFiles.shift();
-        this.uploadImageModal = true;
-        return;
+      if (
+        this.currentImageFile &&
+        this.currentImageFile.imageData &&
+        this.currentImageFile.imageData
+      ) {
+        // 送信処理
+        await this.$apollo.mutate({
+          mutation: queries.sendMessageMutation,
+          variables: {
+            name: this.user.name,
+            message: this.comment,
+            imageData: this.currentImageFile.imageData,
+            imageTitle: this.currentImageFile.imageTitle,
+            channelId: this.channel.id,
+            userId: this.user._id,
+          },
+        });
+        if (this.imageFiles.length !== 0) {
+          this.currentImageFile = this.imageFiles.shift();
+          this.uploadImageModal = true;
+          return;
+        }
       }
     },
     async showChat(channelId: string) {
@@ -311,20 +317,20 @@ export default Vue.extend({
       });
       this.refs.chatInstance.scrollBottom();
     },
-    async createChannel(channelName: string) {
+    async createChannel() {
       await this.$apollo.mutate({
         mutation: queries.createNewChannel,
         variables: {
-          name: channelName,
+          name: this.channelNameInput,
           categoryId: this.selectedCategoryId,
         },
       });
     },
-    async createCategory(categoryName: string) {
+    async createCategory() {
       await this.$apollo.mutate({
         mutation: queries.createNewCategory,
         variables: {
-          name: categoryName,
+          name: this.categoryNameInput,
         },
       });
     },
