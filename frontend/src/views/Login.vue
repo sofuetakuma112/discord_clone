@@ -75,6 +75,7 @@
           <p>
             ああ
           </p>
+          <router-link to="/discord">バックドア</router-link>
         </div>
       </div>
     </div>

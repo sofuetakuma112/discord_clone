@@ -37,6 +37,24 @@
           v-model="password"
         ></v-text-field>
       </div>
+      <div class="input-area">
+        <v-file-input
+          label="File input"
+          filled
+          prepend-icon="mdi-camera"
+          v-model="img"
+          light
+          @change="onImageChange"
+        ></v-file-input>
+      </div>
+      <div class="preview-img" v-if="url">
+        <v-img
+          lazy-src="https://picsum.photos/id/11/10/6"
+          max-height="150"
+          max-width="250"
+          :src="url"
+        ></v-img>
+      </div>
       <div class="error" v-if="errorMessage.length !== 0">
         <p>{{ errorMessage }}</p>
       </div>
@@ -56,23 +74,52 @@
 import Vue from 'vue';
 import api from '@/api/index';
 
+type DataType = {
+  name: string;
+  email: string;
+  password: string;
+  errorMessage: string;
+  img: File | null;
+  url: string;
+  error: Error | null;
+};
+
 export default Vue.extend({
-  name: 'Home',
-  data() {
+  name: 'Register',
+  data(): DataType {
     return {
       name: '',
       email: '',
       password: '',
       errorMessage: '',
+      img: null,
+      url: '',
+      error: null,
     };
   },
   methods: {
+    getBase64(file: File) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = (error) => reject(error);
+      });
+    },
+    onImageChange() {
+      if (this.img) {
+        this.getBase64(this.img)
+          .then((image) => (this.url = image as string))
+          .catch((error: Error) => (this.error = error));
+      } else this.url = '';
+    },
     register() {
       api()
         .post('/api/register', {
           name: this.name,
           email: this.email,
           password: this.password,
+          imageConvertedToBase64: this.url,
         })
         .then((result) => {
           if (result.data.status === 1) {
@@ -142,5 +189,11 @@ export default Vue.extend({
 
 .login {
   text-align: left;
+}
+
+.preview-img {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 15px;
 }
 </style>

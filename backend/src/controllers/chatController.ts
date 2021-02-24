@@ -22,6 +22,8 @@ export const addChat = async (req) => {
       created: new Date(),
       channel_id: request.channel_id,
       user_id: request.user_id,
+      imageData: request.imageData,
+      imageTitle: request.imageTitle,
     };
     const chat = new chatModel(chatData);
     const newChat = await chat.save();

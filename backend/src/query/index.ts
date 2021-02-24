@@ -24,12 +24,15 @@ export const allQuery = `
           _id
           name
           message
+          imageData
+          imageTitle
           created
           channel_id
           user {
             _id
             name
             is_anonymous
+            imageConvertedToBase64
           }
         }
       }

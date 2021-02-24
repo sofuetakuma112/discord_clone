@@ -1,29 +1,18 @@
 <template>
   <div class="text-center">
-    <v-dialog :value="isOpen" width="440" :overlay-opacity="0.9" persistent>
-      <v-card style="background: #36393F">
-        <v-card-title class="pt-5">
-          <h3 class="modal-title">
-            <slot name="title"></slot>
-          </h3>
-          <p class="modal-text"><slot name="title-text"></slot></p>
-        </v-card-title>
-
-        <div class="px-4">
-          <span class="text-field-name"
-            ><slot name="text-field-name"></slot
-          ></span>
-          <v-text-field label="Solo" solo v-model="input"></v-text-field>
-        </div>
-
+    <v-dialog :value="isOpen" :width="width" :overlay-opacity="0.9" persistent>
+      <v-card style="background: #36393F" class="v-card">
+        <slot name="title"></slot>
+        <slot name="img"></slot>
+        <slot name="img-name"></slot>
+        <slot name="text-field-name"></slot>
         <v-divider></v-divider>
-
-        <v-card-actions style="background: #2F3136">
+        <v-card-actions style="background: #2F3136; height: 70px">
           <v-spacer></v-spacer>
           <v-btn color="primary" text @click="isOpen = false">
             キャンセル
           </v-btn>
-          <v-btn color="primary" text @click="createChannelOrCategory">
+          <v-btn color="#fff" text @click="clickedModalOKButton" class="button">
             <slot name="create-button-text"></slot>
           </v-btn>
         </v-card-actions>
@@ -44,6 +33,7 @@ export default Vue.extend({
   props: {
     value: Boolean,
     greyBackGround: Object,
+    width: { type: Number, default: 440 },
   },
   computed: {
     isOpen: {
@@ -56,8 +46,8 @@ export default Vue.extend({
     },
   },
   methods: {
-    createChannelOrCategory() {
-      this.$emit('createChannelOrCategory', this.input)
+    clickedModalOKButton() {
+      this.$emit('clickedModalOKButton', this.input);
       this.input = '';
       this.isOpen = false;
     },
@@ -66,21 +56,13 @@ export default Vue.extend({
 </script>
 
 <style scoped>
-.modal-title {
-  text-align: center;
-  width: 100%;
-  color: #fff;
+.button {
+  background-color: #7289da;
 }
+</style>
 
-.modal-text {
-  text-align: center;
-  width: 100%;
-  font-size: 12px;
-  color: #dcddde;
-}
-
-.text-field-name {
-  font-size: 12px;
-  color: #dcddde;
+<style>
+.v-dialog.v-dialog--active.v-dialog--persistent {
+  overflow-y: visible !important;
 }
 </style>

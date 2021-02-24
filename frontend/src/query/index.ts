@@ -31,12 +31,15 @@ export const channelQuery = gql`
         _id
         name
         message
+        imageData
+        imageTitle
         created
         channel_id
         user {
           _id
           name
           is_anonymous
+          imageConvertedToBase64
         }
       }
     }
@@ -47,18 +50,24 @@ export const sendMessageMutation = gql`
   mutation addChat(
     $name: String!
     $message: String!
+    $imageData: String!
+    $imageTitle: String!
     $channelId: ID!
     $userId: ID!
   ) {
     addChat(
       name: $name
       message: $message
+      imageData: $imageData
+      imageTitle: $imageTitle
       channel_id: $channelId
       user_id: $userId
     ) {
       _id
       name
       message
+      imageData
+      imageTitle
       created
       channel_id
       user_id
@@ -95,6 +104,21 @@ export const categoriesQuery = {
           _id
           name
         }
+      }
+    }
+  `,
+};
+
+export const usersQuery = {
+  query: gql`
+    {
+      users {
+        _id
+        socket_id
+        name
+        email
+        is_anonymous
+        imageConvertedToBase64
       }
     }
   `,

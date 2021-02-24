@@ -24,9 +24,10 @@ export type Category = {
 
 export type User = {
   _id: string;
-  socketId?: string;
   name: string;
+  isAnonumous: string;
+  socketId?: string;
   email?: string;
   password?: string;
-  isAnonumous: string;
+  imageConvertedToBase64?: string;
 };

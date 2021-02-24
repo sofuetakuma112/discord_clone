@@ -7,7 +7,7 @@ require('dotenv').config();
 import crypto from 'crypto';
 import { userModel } from './models/User';
 import { io } from './server';
-import * as userController from './controllers/userController'
+import * as userController from './controllers/userController';
 
 io.on('connection', (socket) => {
   console.log(`${socket.id} connected!`);
@@ -36,6 +36,7 @@ fastify
             .createHmac('sha256', process.env.APP_KEY as string)
             .update(user._id + '-' + rememberToken)
             .digest('hex');
+          // console.log({ status: 1, user });
           if (hash === verifyingHash) reply.send({ status: 1, user });
         }
         reply.send({ status: 2, message: 'tokenの期限が切れています' });
@@ -66,8 +67,6 @@ declare module 'fastify' {
   interface FastifyInstance {
     basicAuth: any;
     auth: any;
-    verifyJWTandLevel: any;
-    verifyUserAndPassword: any;
     asyncVerifyToken: any;
     asyncVerifyUserAndPassword: any;
   }
@@ -85,27 +84,6 @@ async function validate(username, password, req, reply) {
     return new Error('invalid user');
   }
 }
-
-// addHookを呼び出して、リクエストごとにvalidateでユーザー名とパスワードをチェックするフックを追加しました。
-// afterフックに登録されているルートはすべてbasic authで保護されています。
-// fastify.after(() => {
-//   fastify.addHook('onRequest', fastify.basicAuth);
-//   fastify.get('/test', (req, reply) => {
-//     reply.send({ hello: 'world' });
-//   });
-// });
-
-// onRequestプロパティと一緒に使うこともできます。
-// fastify.after(() => {
-//   fastify.route({
-//     method: 'GET',
-//     url: '/',
-//     onRequest: fastify.basicAuth,
-//     handler: async (req, reply) => {
-//       return { hello: 'world' }
-//     }
-//   })
-// })
 
 // Fastify GraphQLアダプタが必要なので、
 // スキーマをインポートし、FastifyにGraphQLアダプタを登録します。

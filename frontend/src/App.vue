@@ -25,6 +25,7 @@ export default Vue.extend({
     this.socket = io('http://0.0.0.0:3000');
 
     if (localStorage.tokenAndHash) {
+      console.log(localStorage.tokenAndHash);
       api()
         .post('/auth', { tokenAndHash: localStorage.tokenAndHash })
         .then((result) => {
@@ -34,9 +35,8 @@ export default Vue.extend({
               name: result.data.user.name,
               email: result.data.user.email,
               isAnonymous: result.data.user.is_anonymous,
+              imageConvertedToBase64: result.data.user.imageConvertedToBase64,
             });
-          } else {
-            // ログインが必要
           }
         });
     }

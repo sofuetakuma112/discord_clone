@@ -10,6 +10,11 @@ export const getSingleUser = async (req) => {
   return user;
 };
 
+export const getAllUsers = async () => {
+  const users = await userModel.find();
+  return users;
+};
+
 export const authenticateSingleUser = async (req, reply) => {
   try {
     const request = req.body === undefined ? req : req.body;
@@ -50,13 +55,7 @@ export const authenticateSingleUser = async (req, reply) => {
 export const createNewUser = async (req) => {
   try {
     const request = req.body === undefined ? req : req.body;
-    const rememberToken = crypto.randomBytes(20).toString('hex');
-    const hashed = {
-      ...request,
-      rememberToken,
-      password: bcrypt.hashSync(request.password, 10),
-      is_anonymous: false,
-    };
+
     const userData: any = await userModel.find({
       email: request.email,
     });
@@ -65,9 +64,17 @@ export const createNewUser = async (req) => {
         message: 'このメールアドレスはすでに使用されています',
         status: 2,
       };
-    const user = new userModel(hashed);
 
+    const rememberToken = crypto.randomBytes(20).toString('hex');
+    const hashed = {
+      ...request,
+      rememberToken,
+      password: bcrypt.hashSync(request.password, 10),
+      is_anonymous: false,
+    };
+    const user = new userModel(hashed);
     const newUser = await user.save();
+
     // ハッシュを作成（公開鍵のようなもの？）
     const hash = crypto
       .createHmac('sha256', process.env.APP_KEY as string)

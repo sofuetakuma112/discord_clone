@@ -22,9 +22,6 @@ const routes: Array<RouteConfig> = [
     path: '/discord',
     name: 'Discord',
     component: Discord,
-    meta: {
-      requiresAuth: true,
-    },
   },
 ];
 

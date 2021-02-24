@@ -39,6 +39,7 @@ const userType = new GraphQLObjectType({
     name: { type: GraphQLString },
     email: { type: GraphQLString },
     is_anonymous: { type: GraphQLString },
+    imageConvertedToBase64: { type: GraphQLString },
   }),
 });
 
@@ -49,11 +50,14 @@ const chatType = new GraphQLObjectType({
     name: { type: GraphQLString },
     message: { type: GraphQLString },
     created: { type: GraphQLString },
+    imageData: { type: GraphQLString },
+    imageTitle: { type: GraphQLString },
     channel_id: { type: GraphQLID },
     user_id: { type: GraphQLID },
     user: {
       type: userType,
       async resolve(parent, args) {
+        // id一致するものが一つもなければnullが返ってくる
         const result = await userController.getSingleUser({
           id: parent.user_id,
         });
@@ -101,6 +105,12 @@ const categoryType = new GraphQLObjectType({
 const RootQuery = new GraphQLObjectType({
   name: 'RootQueryType',
   fields: {
+    users: {
+      type: GraphQLList(userType),
+      async resolve(parent, args) {
+        return await userController.getAllUsers();
+      },
+    },
     channel: {
       type: channelType,
       args: { id: { type: GraphQLID } },
@@ -127,6 +137,8 @@ const Mutations = new GraphQLObjectType({
       args: {
         name: { type: new GraphQLNonNull(GraphQLString) },
         message: { type: new GraphQLNonNull(GraphQLString) },
+        imageData: { type: GraphQLString },
+        imageTitle: { type: GraphQLString },
         channel_id: { type: GraphQLID },
         user_id: { type: GraphQLID },
       },
