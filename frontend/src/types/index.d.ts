@@ -9,7 +9,7 @@ export type Chat = {
 
 export type Channel = {
   name: string;
-  id: string;
+  _id: string;
   categoryId: string;
 };
 

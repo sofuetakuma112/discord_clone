@@ -30,32 +30,51 @@ fastify
       .find({
         rememberToken,
       })
-      .then((users) => {
+      .then(async (users: any) => {
         for (const user of users) {
           const verifyingHash = crypto
             .createHmac('sha256', process.env.APP_KEY as string)
             .update(user._id + '-' + rememberToken)
             .digest('hex');
-          // console.log({ status: 1, user });
-          if (hash === verifyingHash) reply.send({ status: 1, user });
+          if (hash === verifyingHash) {
+            // ここでトークンを再度生成するべき
+            const rememberToken = crypto.randomBytes(20).toString('hex');
+            const hash = crypto
+              .createHmac('sha256', process.env.APP_KEY as string)
+              .update(user._id + '-' + rememberToken)
+              .digest('hex');
+            const tokenAndHash = rememberToken + '|' + hash;
+
+            await userModel.updateOne(
+              {
+                email: user.email,
+              },
+              { $set: { rememberToken } }
+            );
+            reply.send({
+              _id: user._id,
+              name: user.name,
+              email: user.email,
+              imageConvertedToBase64: user.imageConvertedToBase64,
+              tokenAndHash,
+              is_anonymous: user.is_anonymous,
+              status: 1,
+              socket_id: '',
+            })
+          } else {
+            // 不正なトークンでアクセスしている
+            reply.send({ status: 2, message: '不正なトークンです' });
+          }
         }
         reply.send({ status: 2, message: 'tokenの期限が切れています' });
       });
-  })
-  .decorate('asyncVerifyUserAndPassword', function (request, reply) {
-    console.log('asyncVerifyUserAndPassword');
-    // DBに問い合わせて一致するドキュメントがあればdone
-    return Promise.resolve();
   })
   .register(require('fastify-auth'))
   .after(() => {
     fastify.route({
       method: 'POST',
       url: '/auth',
-      preHandler: fastify.auth([
-        fastify.asyncVerifyToken,
-        fastify.asyncVerifyUserAndPassword,
-      ]),
+      preHandler: fastify.auth([fastify.asyncVerifyToken]),
       handler: (req, reply) => {
         req.log.info('Auth route');
         reply.send({ hello: 'world' });

@@ -1,6 +1,5 @@
 import Vue from 'vue';
 import VueRouter, { RouteConfig } from 'vue-router';
-import store from '@/store/index';
 import Discord from '@/views/Discord.vue';
 import Login from '@/views/Login.vue';
 import Register from '@/views/Register.vue';

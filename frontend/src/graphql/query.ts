@@ -13,8 +13,18 @@ export const allQuery = gql`
           _id
           name
           message
+          imageData
+          imageTitle
           created
           channel_id
+          user_id
+          user {
+            _id
+            name
+            email
+            is_anonymous
+            imageConvertedToBase64
+          }
         }
       }
     }
@@ -42,54 +52,6 @@ export const channelQuery = gql`
           imageConvertedToBase64
         }
       }
-    }
-  }
-`;
-
-export const sendMessageMutation = gql`
-  mutation addChat(
-    $name: String!
-    $message: String!
-    $imageData: String!
-    $imageTitle: String!
-    $channelId: ID!
-    $userId: ID!
-  ) {
-    addChat(
-      name: $name
-      message: $message
-      imageData: $imageData
-      imageTitle: $imageTitle
-      channel_id: $channelId
-      user_id: $userId
-    ) {
-      _id
-      name
-      message
-      imageData
-      imageTitle
-      created
-      channel_id
-      user_id
-    }
-  }
-`;
-
-export const createNewChannel = gql`
-  mutation createChannel($name: String!, $categoryId: ID!) {
-    createChannel(name: $name, category_id: $categoryId) {
-      _id
-      name
-      category_id
-    }
-  }
-`;
-
-export const createNewCategory = gql`
-  mutation createCategory($name: String!) {
-    createCategory(name: $name) {
-      _id
-      name
     }
   }
 `;

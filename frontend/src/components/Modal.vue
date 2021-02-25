@@ -2,6 +2,7 @@
   <div class="text-center">
     <v-dialog :value="isOpen" :width="width" :overlay-opacity="0.9" persistent>
       <v-card style="background: #36393F" class="v-card">
+        <slot name="content"></slot>
         <slot name="title"></slot>
         <slot name="img"></slot>
         <slot name="img-name"></slot>
@@ -12,7 +13,13 @@
           <v-btn color="primary" text @click="isOpen = false">
             キャンセル
           </v-btn>
-          <v-btn color="#fff" text @click="clickedModalOKButton" class="button">
+          <v-btn
+            color="#fff"
+            text
+            @click="clickedModalOKButton"
+            class="button"
+            :class="{ danger: danger }"
+          >
             <slot name="create-button-text"></slot>
           </v-btn>
         </v-card-actions>
@@ -34,6 +41,7 @@ export default Vue.extend({
     value: Boolean,
     greyBackGround: Object,
     width: { type: Number, default: 440 },
+    danger: { type: Boolean, default: false },
   },
   computed: {
     isOpen: {
@@ -58,6 +66,10 @@ export default Vue.extend({
 <style scoped>
 .button {
   background-color: #7289da;
+}
+
+.danger {
+  background-color: #d84040;
 }
 </style>
 

@@ -15,7 +15,7 @@ export const getAllUsers = async () => {
   return users;
 };
 
-export const authenticateSingleUser = async (req, reply) => {
+export const authenticateSingleUser = async (req) => {
   try {
     const request = req.body === undefined ? req : req.body;
     const user: any = await userModel.find({
@@ -44,9 +44,23 @@ export const authenticateSingleUser = async (req, reply) => {
 
       const tokenAndHash = rememberToken + '|' + hash;
 
-      return { user, tokenAndHash };
+      console.log(user);
+
+      return {
+        _id: user[0]._id,
+        name: user[0].name,
+        email: user[0].email,
+        imageConvertedToBase64: user[0].imageConvertedToBase64,
+        tokenAndHash,
+        is_anonymous: user[0].is_anonymous,
+        status: 1,
+        socket_id: '',
+      };
     }
-    return { message: 'メールアドレスまたはパスワードが違います' };
+    return {
+      errorMessage: 'メールアドレスまたはパスワードが違います',
+      status: 2,
+    };
   } catch (error) {
     throw boom.boomify(error);
   }
@@ -56,12 +70,22 @@ export const createNewUser = async (req) => {
   try {
     const request = req.body === undefined ? req : req.body;
 
+    if (request.is_anonymous) {
+      const user = new userModel({
+        name: request.name,
+        socket_id: request.socket_id,
+        is_anonymous: true,
+      });
+      const newAnonymosUser = user.save();
+      return newAnonymosUser;
+    }
+
     const userData: any = await userModel.find({
       email: request.email,
     });
     if (userData.length !== 0)
       return {
-        message: 'このメールアドレスはすでに使用されています',
+        errorMessage: 'このメールアドレスはすでに使用されています',
         status: 2,
       };
 
@@ -73,7 +97,7 @@ export const createNewUser = async (req) => {
       is_anonymous: false,
     };
     const user = new userModel(hashed);
-    const newUser = await user.save();
+    const newUser: any = await user.save();
 
     // ハッシュを作成（公開鍵のようなもの？）
     const hash = crypto
@@ -82,7 +106,16 @@ export const createNewUser = async (req) => {
       .digest('hex');
     const tokenAndHash = rememberToken + '|' + hash;
 
-    return { newUser, tokenAndHash, status: 1 };
+    return {
+      _id: newUser._id,
+      name: newUser.name,
+      email: newUser.email,
+      tokenAndHash,
+      status: 1,
+      socket_id: '',
+      is_anonymous: newUser.is_anonymous,
+      imageConvertedToBase64: newUser.imageConvertedToBase64,
+    };
   } catch (error) {
     throw boom.boomify(error);
   }

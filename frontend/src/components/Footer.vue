@@ -3,10 +3,12 @@
     <v-footer app color="transparent" height="72" inset class="v-footer">
       <div class="input-area">
         <v-file-input
+          :disabled="!isShowAnyChannel"
           multiple
           label="File input"
           hide-input
           class="file pa-0 ma-0"
+          color="#fff"
           background-color="#40444C"
           v-model="img"
           @change="onImageChange"
@@ -60,11 +62,12 @@ export default Vue.extend({
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = () => resolve({
-          index,
-          imageData: reader.result,
-          imageTitle: file.name,
-        });
+        reader.onload = () =>
+          resolve({
+            index,
+            imageData: reader.result,
+            imageTitle: file.name,
+          });
         reader.onerror = (error) => reject(error);
       });
     },
@@ -75,7 +78,7 @@ export default Vue.extend({
           promises.push(this.getBase64(file, index));
         }
         const files = await Promise.all(promises);
-        this.$emit('imageFileSelectedInChatForm', files)
+        this.$emit('imageFileSelectedInChatForm', files);
       }
     },
   },
@@ -108,5 +111,11 @@ export default Vue.extend({
   display: block;
   padding-left: 40px;
   color: white;
+}
+</style>
+
+<style>
+.mdi-paperclip::before {
+  color: #fff !important;
 }
 </style>

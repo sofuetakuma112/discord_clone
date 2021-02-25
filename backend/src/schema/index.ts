@@ -15,6 +15,7 @@ const {
   GraphQLString,
   GraphQLInt,
   GraphQLID,
+  GraphQLBoolean,
   GraphQLList,
   GraphQLNonNull,
   GraphQLScalarType,
@@ -40,6 +41,10 @@ const userType = new GraphQLObjectType({
     email: { type: GraphQLString },
     is_anonymous: { type: GraphQLString },
     imageConvertedToBase64: { type: GraphQLString },
+    tokenAndHash: { type: GraphQLString },
+    status: { type: GraphQLInt },
+    password: { type: GraphQLString },
+    errorMessage: { type: GraphQLString },
   }),
 });
 
@@ -132,6 +137,65 @@ const RootQuery = new GraphQLObjectType({
 const Mutations = new GraphQLObjectType({
   name: 'Mutations',
   fields: {
+    createUser: {
+      type: userType,
+      args: {
+        name: { type: new GraphQLNonNull(GraphQLString) },
+        email: { type: new GraphQLNonNull(GraphQLString) },
+        password: { type: GraphQLNonNull(GraphQLString) },
+        imageConvertedToBase64: { type: GraphQLString },
+        is_anonymous: { type: GraphQLBoolean },
+        socket_id: { type: GraphQLString },
+      },
+      async resolve(parent, args) {
+        const data = await userController.createNewUser(args);
+        await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: queries.usersQuery }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            io.emit('latestUsers', JSON.stringify(data));
+          });
+        return data;
+      },
+    },
+    authenticateUser: {
+      type: userType,
+      args: {
+        email: { type: new GraphQLNonNull(GraphQLString) },
+        password: { type: GraphQLNonNull(GraphQLString) },
+      },
+      async resolve(parent, args) {
+        const data = await userController.authenticateSingleUser(args);
+        // アカウントのリアルタイムでオンライン情報を表示するならここに何か書く
+        return data;
+      },
+    },
+    deleteChat: {
+      type: chatType,
+      args: {
+        _id: { type: GraphQLID },
+      },
+      async resolve(parent, args) {
+        const data = await chatController.deleteChat(args);
+        fetchLatestAllData();
+        return data;
+      },
+    },
+    editChat: {
+      type: chatType,
+      args: {
+        message: { type: new GraphQLNonNull(GraphQLString) },
+        _id: { type: GraphQLID },
+      },
+      async resolve(parent, args) {
+        const data = await chatController.editChat(args);
+        fetchLatestAllData();
+        return data;
+      },
+    },
     addChat: {
       type: chatType,
       args: {
@@ -144,15 +208,7 @@ const Mutations = new GraphQLObjectType({
       },
       async resolve(parent, args) {
         const data = await chatController.addChat(args);
-        await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: queries.allQuery }),
-        })
-          .then((response) => response.json())
-          .then((data) => {
-            io.emit('latestData', JSON.stringify(data));
-          });
+        fetchLatestAllData();
         return data;
       },
     },
@@ -182,6 +238,18 @@ const Mutations = new GraphQLObjectType({
     },
   },
 });
+
+const fetchLatestAllData = async () => {
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: queries.allQuery }),
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      io.emit('latestData', JSON.stringify(data));
+    });
+};
 
 const fetchLatestCategories = async () => {
   await fetch(url, {

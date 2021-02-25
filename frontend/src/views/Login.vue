@@ -84,7 +84,7 @@
 
 <script lang="ts">
 import Vue from 'vue';
-import api from '@/api/index';
+import * as mutations from '@/graphql/mutation';
 
 export default Vue.extend({
   data() {
@@ -101,47 +101,53 @@ export default Vue.extend({
     socket: Object,
   },
   methods: {
-    login() {
+    async login() {
       if (
         this.email.length !== 0 &&
         this.password.length !== 0 &&
         this.tab === 0
       ) {
-        api()
-          .post('/api/login', {
+        const response = await this.$apollo.mutate({
+          mutation: mutations.authenticateUser,
+          variables: {
             email: this.email,
             password: this.password,
-          })
-          .then((result) => {
-            if (result.data.message) {
-              this.errorMessage = result.data.message;
-            } else {
-              localStorage.tokenAndHash = result.data.tokenAndHash;
-              this.$store.commit('updateUser', {
-                _id: result.data.user[0]._id,
-                socketId: result.data.user[0].socket_id,
-                name: result.data.user[0].name,
-                email: result.data.user[0].email,
-                isAnonymous: result.data.user[0].is_anonymous,
-              });
-              this.$router.push({ name: 'Discord' });
-            }
+          },
+        });
+        const data = response.data.authenticateUser;
+        if (data.status === 2) {
+          this.errorMessage = data.errorMessage;
+        } else {
+          localStorage.tokenAndHash = data.tokenAndHash;
+          this.$store.commit('updateUser', {
+            _id: data._id,
+            socketId: data.socket_id,
+            name: data.name,
+            email: data.email,
+            isAnonymous: data.is_anonymous,
+            imageConvertedToBase64: data.imageConvertedToBase64,
           });
+          this.$router.push({ name: 'Discord' });
+        }
       } else if (this.anonymousName.length !== 0 && this.tab === 1) {
-        api()
-          .post('/api/anonymousLogin', {
+        const response = await this.$apollo.mutate({
+          mutation: mutations.createNewUser,
+          variables: {
+            name: this.anonymousName,
+            email: '',
+            password: '',
+            imageConvertedToBase64: '',
+            isAnonymous: true,
             socketId: this.socket.id,
-            anonymousName: this.anonymousName,
-          })
-          .then((result) => {
-            this.$store.commit('updateUser', {
-              _id: result.data._id,
-              socketId: result.data.socket_id,
-              name: result.data.name,
-              isAnonymous: result.data.is_anonymous,
-            });
-            this.$router.push({ name: 'Discord' });
-          });
+          },
+        });
+        this.$store.commit('updateUser', {
+          _id: response.data.createUser._id,
+          socketId: response.data.createUser.socket_id,
+          name: response.data.createUser.name,
+          isAnonymous: response.data.createUser.is_anonymous,
+        });
+        this.$router.push({ name: 'Discord' });
       }
     },
   },

@@ -22,17 +22,15 @@
           </template>
           <v-list class="pa-0">
             <v-list-item @click="createNewCategory">
-              <v-list-item-title
-                >カテゴリーを新規作成</v-list-item-title
-              >
+              <v-list-item-title>カテゴリーを新規作成</v-list-item-title>
             </v-list-item>
           </v-list>
         </v-menu>
       </v-row>
     </v-sheet>
     <v-row dense justify="center" :style="darkBackGround">
-      <v-expansion-panels focusable flat accordion>
-        <v-expansion-panel v-for="category in categories" :key="category._id">
+      <v-expansion-panels focusable flat accordion multiple>
+        <v-expansion-panel v-for="category in allData" :key="category._id">
           <v-expansion-panel-header
             class="px-4 grey--text"
             :style="darkBackGround"
@@ -54,7 +52,7 @@
               @click="showChat(channel._id)"
             >
               <v-list-item-content>
-                <v-list-item-title class="grey--text">{{
+                <v-list-item-title class="grey--text"># {{
                   channel.name
                 }}</v-list-item-title>
               </v-list-item-content>
@@ -78,7 +76,7 @@ export default Vue.extend({
   },
   props: {
     darkBackGround: Object,
-    categories: Array,
+    allData: Array,
   },
   methods: {
     showChat(channelId: string) {
@@ -93,6 +91,25 @@ export default Vue.extend({
   },
 });
 </script>
+
+<style>
+.v-expansion-panel-header {
+  min-height: auto !important;
+  padding: 0 !important;
+}
+
+.v-expansion-panel--active > .v-expansion-panel-header {
+  min-height: auto !important;
+}
+
+.v-list-item--link:before {
+  background-color: #33363C !important;
+}
+
+.v-expansion-panel-content__wrap {
+  padding: 0 !important;
+}
+</style>
 
 <style scoped>
 .category-title {

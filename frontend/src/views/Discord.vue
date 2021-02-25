@@ -3,7 +3,7 @@
     <Header :greyBackGround="greyBackGround" :channel="channel" />
     <LeftSidebar
       :darkBackGround="darkBackGround"
-      :categories="categories"
+      :allData="allData"
       @showChat="showChat"
       @openAddChannelModal="openAddChannelModal"
       @openCreateCategoryModal="createCategoryModal = true"
@@ -18,7 +18,7 @@
     <Footer
       @send="send"
       @imageFileSelectedInChatForm="imageFileSelectedInChatForm"
-      :isShowAnyChannel="channel.id.length !== 0"
+      :isShowAnyChannel="selectedChannelId.length !== 0"
       v-model="chatInput"
     />
     <ImageModal :image="currentOpeningModalImageData" v-model="imageModal" />
@@ -28,15 +28,11 @@
       @clickedModalOKButton="uploadImage"
       :width="530"
     >
-      <template v-slot:img>
+      <template v-slot:content>
         <img :src="currentImageFile.imageData" alt="" class="upload-img" />
-      </template>
-      <template v-slot:img-name>
         <p class="img-name">
           {{ currentImageFile.imageTitle }}
         </p>
-      </template>
-      <template v-slot:text-field-name>
         <div class="px-4">
           <span class="text-field-name">コメント追加(任意)</span>
           <v-text-field
@@ -54,25 +50,24 @@
       :greyBackGround="greyBackGround"
       @clickedModalOKButton="createChannel"
     >
-      <template v-slot:title
-        ><v-card-title class="pt-5">
+      <template v-slot:content>
+        <v-card-title class="pt-5">
           <h3 class="modal-title">
             テキストチャンネルを作成
           </h3>
           <p class="modal-text">
-            <slot name="title-text"></slot>
-          </p> </v-card-title
-      ></template>
-      <template v-slot:title-text>テキストチャンネル内</template>
-      <template v-slot:text-field-name
-        ><div class="px-4">
+            <slot name="title-text">テキストチャンネル内</slot>
+          </p>
+        </v-card-title>
+        <div class="px-4">
           <span class="text-field-name">チャンネル名</span>
           <v-text-field
             label="Solo"
             solo
             v-model="channelNameInput"
-          ></v-text-field></div
-      ></template>
+          ></v-text-field>
+        </div>
+      </template>
       <template v-slot:create-button-text>チャンネルを作成</template>
     </Modal>
     <Modal
@@ -81,24 +76,21 @@
       :categoryId="selectedCategoryId"
       @clickedModalOKButton="createCategory"
     >
-      <template v-slot:title
-        ><v-card-title class="pt-5">
+      <template v-slot:content>
+        <v-card-title class="pt-5">
           <h3 class="modal-title">
             カテゴリーを作成
           </h3>
-          <p class="modal-text">
-            <slot name="title-text"></slot>
-          </p> </v-card-title
-      ></template>
-      <template v-slot:text-field-name
-        ><div class="px-4">
+        </v-card-title>
+        <div class="px-4">
           <span class="text-field-name">カテゴリー名</span>
           <v-text-field
             label="Solo"
             solo
             v-model="categoryNameInput"
-          ></v-text-field></div
-      ></template>
+          ></v-text-field>
+        </div>
+      </template>
       <template v-slot:create-button-text>カテゴリーを作成</template>
     </Modal>
   </div>
@@ -113,7 +105,8 @@ import Chat from '@/components/Chat.vue';
 import Footer from '@/components/Footer.vue';
 import Modal from '@/components/Modal.vue';
 import ImageModal from '@/components/ImageModal.vue';
-import * as queries from '@/query/index';
+import * as queries from '@/graphql/query';
+import * as mutations from '@/graphql/mutation';
 // import { io, Socket } from 'socket.io-client';
 import * as types from '@/types/index';
 
@@ -137,6 +130,7 @@ type DataType = {
   currentImageFile: Image | undefined;
   comment: string;
   currentOpeningModalImageData: string;
+  allData: any;
 };
 
 type Image = {
@@ -165,7 +159,7 @@ export default Vue.extend({
       },
       channel: {
         name: '',
-        id: '',
+        _id: '',
         categoryId: '',
       },
       chats: [],
@@ -188,6 +182,7 @@ export default Vue.extend({
       channelNameInput: '',
       categoryNameInput: '',
       currentOpeningModalImageData: '',
+      allData: [],
     };
   },
   props: {
@@ -203,6 +198,12 @@ export default Vue.extend({
   },
   async created() {
     if (!Object.keys(this.user).length) this.$router.push({ name: 'Login' });
+    this.socket.on('latestUsers', (response: any) => {
+      const parsedData = JSON.parse(response);
+      console.log(parsedData);
+      this.users = [];
+      this.users = parsedData.data.users;
+    });
     this.socket.on('latestCategories', (response: any) => {
       const parsedData = JSON.parse(response);
       this.categories = [];
@@ -210,7 +211,9 @@ export default Vue.extend({
     });
     this.socket.on('latestData', (response: any) => {
       const parsedData = JSON.parse(response);
-      for (const category of parsedData.data.categories) {
+      this.allData = [];
+      this.allData = parsedData.data.categories;
+      for (const category of this.allData) {
         const selectedChannelNewData = category.channels.find(
           (channel: any) => channel._id === this.selectedChannelId
         );
@@ -225,18 +228,25 @@ export default Vue.extend({
       }
     });
 
+    const allData = await this.$apollo.query({
+      query: queries.allQuery,
+    });
+    this.allData = allData.data.categories;
+
+    // userデータの取得
     const response = await this.$apollo.query(queries.usersQuery);
+    console.log(response.data);
     this.users = response.data.users;
 
-    try {
-      const response = await this.$apollo.query(queries.categoriesQuery);
-      this.categories = response.data.categories;
-    } catch (error) {
-      console.log(error.message);
-    }
+    // try {
+    //   const response = await this.$apollo.query(queries.categoriesQuery);
+    //   this.categories = response.data.categories;
+    // } catch (error) {
+    //   console.log(error.message);
+    // }
   },
   watch: {
-    $route(to, from) {
+    $route(to) {
       if (to.name === 'Discord' && !this.$store.getters.getUser) {
         this.$router.push({ name: 'Login' });
       }
@@ -263,13 +273,13 @@ export default Vue.extend({
       ) {
         // 送信処理
         await this.$apollo.mutate({
-          mutation: queries.sendMessageMutation,
+          mutation: mutations.sendMessageMutation,
           variables: {
             name: this.user.name,
             message: this.comment,
             imageData: this.currentImageFile.imageData,
             imageTitle: this.currentImageFile.imageTitle,
-            channelId: this.channel.id,
+            channelId: this.selectedChannelId,
             userId: this.user._id,
           },
         });
@@ -281,45 +291,40 @@ export default Vue.extend({
       }
     },
     async showChat(channelId: string) {
-      const response = await this.$apollo.query({
-        query: queries.channelQuery,
-        variables: {
-          id: channelId,
-        },
-      });
-      console.log(response);
-      const channel = response.data.channel;
-
-      this.selectedChannelId = channel._id;
-      this.channel = {
-        name: channel.name,
-        id: channel._id,
-        categoryId: channel.category_id,
-      };
-
-      this.chats = channel.chats.map((chat: types.Chat) => ({
-        ...chat,
-        created: this.formDate(new Date(Number(chat.created))),
-      }));
+      if (this.selectedChannelId === channelId) return;
+      this.selectedChannelId = channelId;
+      for (const category of this.allData) {
+        const selectedChannel = category.channels.find(
+          (channel: types.Channel) => channel._id === channelId
+        );
+        if (selectedChannel) {
+          this.chats = selectedChannel.chats.map((chat: types.Chat) => ({
+            ...chat,
+            created: this.formDate(new Date(Number(chat.created))),
+          }));
+          break;
+        }
+      }
       this.refs.chatInstance.scrollBottom();
     },
     async send() {
       await this.$apollo.mutate({
-        mutation: queries.sendMessageMutation,
+        mutation: mutations.sendMessageMutation,
         variables: {
           name: this.user.name,
           message: this.chatInput,
           imageData: '',
           imageTitle: '',
-          channelId: this.channel.id,
+          channelId: this.selectedChannelId,
           userId: this.user._id,
         },
       });
+      this.chatInput = '';
       this.refs.chatInstance.scrollBottom();
     },
     async createChannel() {
       await this.$apollo.mutate({
-        mutation: queries.createNewChannel,
+        mutation: mutations.createNewChannel,
         variables: {
           name: this.channelNameInput,
           categoryId: this.selectedCategoryId,
@@ -328,7 +333,7 @@ export default Vue.extend({
     },
     async createCategory() {
       await this.$apollo.mutate({
-        mutation: queries.createNewCategory,
+        mutation: mutations.createNewCategory,
         variables: {
           name: this.categoryNameInput,
         },
@@ -394,6 +399,13 @@ export default Vue.extend({
 .text-field-name {
   font-size: 12px;
   color: #dcddde;
+}
+
+.text-subtitle {
+  text-align: center;
+  color: #b9bbbe;
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .img-name {

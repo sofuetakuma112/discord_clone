@@ -25,19 +25,21 @@ export default Vue.extend({
     this.socket = io('http://0.0.0.0:3000');
 
     if (localStorage.tokenAndHash) {
-      console.log(localStorage.tokenAndHash);
       api()
         .post('/auth', { tokenAndHash: localStorage.tokenAndHash })
         .then((result) => {
           if (result.data.status === 1) {
+            localStorage.tokenAndHash = result.data.tokenAndHash;
             this.$store.commit('updateUser', {
-              _id: result.data.user._id,
-              name: result.data.user.name,
-              email: result.data.user.email,
-              isAnonymous: result.data.user.is_anonymous,
-              imageConvertedToBase64: result.data.user.imageConvertedToBase64,
+              _id: result.data._id,
+              name: result.data.name,
+              email: result.data.email,
+              isAnonymous: result.data.is_anonymous,
+              imageConvertedToBase64: result.data.imageConvertedToBase64,
             });
-          }
+            if (this.$route.name !== 'Discord')
+              this.$router.push({ name: 'Discord' });
+          } else localStorage.removeItem('tokenAndHash');
         });
     }
   },

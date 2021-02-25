@@ -32,3 +32,20 @@ export const addChat = async (req) => {
     throw boom.boomify(error);
   }
 };
+
+export const editChat = async (req) => {
+  const request = req.body === undefined ? req : req.body;
+  const result = await chatModel.updateOne(
+    {
+      _id: request._id,
+    },
+    { $set: { message: request.message } }
+  );
+  return result;
+};
+
+export const deleteChat = async (req) => {
+  const request = req.body === undefined ? req : req.body;
+  const result = await chatModel.deleteOne({ _id: request._id });
+  return result;
+};

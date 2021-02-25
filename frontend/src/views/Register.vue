@@ -61,9 +61,7 @@
             <v-btn
               class="primary"
               @click="
-                (cropedImage = refs.cropper
-                  .getCroppedCanvas()
-                  .toDataURL()),
+                (cropedImageData = refs.cropper.getCroppedCanvas().toDataURL()),
                   (dialog = false)
               "
               >Crop</v-btn
@@ -72,11 +70,11 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
-      <div class="preview-img" v-if="cropedImage">
+      <div class="preview-img" v-if="cropedImageData">
         <v-img
           lazy-src="https://picsum.photos/id/11/10/6"
           max-width="350"
-          :src="cropedImage"
+          :src="cropedImageData"
         ></v-img>
       </div>
       <div class="error" v-if="errorMessage.length !== 0">
@@ -96,9 +94,9 @@
 
 <script lang="ts">
 import Vue from 'vue';
-import api from '@/api/index';
 import VueCropper from 'vue-cropperjs';
 import 'cropperjs/dist/cropper.css';
+import * as mutations from '@/graphql/mutation';
 
 type DataType = {
   name: string;
@@ -108,12 +106,8 @@ type DataType = {
   img: File | null;
   fullImageData: string;
   error: Error | null;
-  mineType: string;
-  cropedImage: string;
-  autoCrop: boolean;
-  image: string;
+  cropedImageData: string;
   dialog: boolean;
-  files: string;
 };
 
 export default Vue.extend({
@@ -129,13 +123,9 @@ export default Vue.extend({
       errorMessage: '',
       img: null,
       fullImageData: '',
+      cropedImageData: '',
       error: null,
-      mineType: '',
-      cropedImage: '',
-      autoCrop: false,
-      image: '',
       dialog: false,
-      files: '',
     };
   },
   computed: {
@@ -161,33 +151,36 @@ export default Vue.extend({
             this.refs.cropper.replace(this.fullImageData);
           })
           .catch((error: Error) => (this.error = error));
-      } else this.cropedImage = '';
+      } else this.cropedImageData = '';
     },
-    register() {
-      api()
-        .post('/api/register', {
+    async register() {
+      const response = await this.$apollo.mutate({
+        mutation: mutations.createNewUser,
+        variables: {
           name: this.name,
           email: this.email,
           password: this.password,
-          imageConvertedToBase64: this.cropedImage,
-        })
-        .then((result) => {
-          if (result.data.status === 1) {
-            // 成功
-            localStorage.tokenAndHash = result.data.tokenAndHash;
-            // アカウント作成直後はトークン認証する必要がないので、
-            // そのままstoreに入れる
-            this.$store.commit('updateUser', {
-              _id: result.data.newUser._id,
-              name: result.data.newUser.name,
-              email: result.data.newUser.email,
-              isAnonymous: result.data.newUser.isAnonymous,
-            });
-            this.$router.push({ name: 'Discord' });
-          } else {
-            this.errorMessage = result.data.message;
-          }
+          imageConvertedToBase64: this.cropedImageData,
+          isAnonymous: false,
+          socketId: '',
+        },
+      });
+
+      if (response.data.createUser.status === 1) {
+        localStorage.tokenAndHash = response.data.createUser.tokenAndHash;
+        this.$store.commit('updateUser', {
+          _id: response.data.createUser._id,
+          name: response.data.createUser.name,
+          email: response.data.createUser.email,
+          isAnonymous: response.data.createUser.is_anonymous,
+          imageConvertedToBase64:
+            response.data.createUser.imageConvertedToBase64,
+          socketId: response.data.createUser.socket_id,
         });
+        this.$router.push({ name: 'Discord' });
+      } else {
+        this.errorMessage = response.data.createUser.errorMessage;
+      }
     },
   },
 });

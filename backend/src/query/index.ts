@@ -1,3 +1,16 @@
+export const usersQuery = `
+  {
+    users {
+      _id
+      socket_id
+      name
+      email
+      is_anonymous
+      imageConvertedToBase64
+    }
+  }
+`;
+
 export const categoriesQuery = `
   {
     categories {

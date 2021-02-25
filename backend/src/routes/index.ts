@@ -2,8 +2,6 @@ import * as categoryController from '../controllers/categoryController';
 import * as channelController from '../controllers/channelController';
 import * as chatController from '../controllers/chatController';
 import * as userController from '../controllers/userController';
-import { categorySchema } from '../models/Category';
-import { FastifySchema } from 'fastify';
 
 const routes = (fastify) => {
   return [
