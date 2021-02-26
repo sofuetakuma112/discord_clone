@@ -16,7 +16,7 @@ export const allQuery = gql`
           imageData
           imageTitle
           created
-          channel_id
+          parent_id
           user_id
           user {
             _id
@@ -26,6 +26,42 @@ export const allQuery = gql`
             imageConvertedToBase64
           }
         }
+      }
+    }
+  }
+`;
+
+export const dmsQuery = gql`
+  {
+    dms {
+      _id
+      chats {
+        name
+        message
+        imageData
+        imageTitle
+        created
+        parent_id
+        user {
+          _id
+          name
+          is_anonymous
+          imageConvertedToBase64
+        }
+      }
+      fromUser {
+        _id
+        name
+        email
+        is_anonymous
+        imageConvertedToBase64
+      }
+      toUser {
+        _id
+        name
+        email
+        is_anonymous
+        imageConvertedToBase64
       }
     }
   }
@@ -44,7 +80,7 @@ export const channelQuery = gql`
         imageData
         imageTitle
         created
-        channel_id
+        parent_id
         user {
           _id
           name

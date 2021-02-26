@@ -2,10 +2,10 @@ import boom from 'boom';
 
 import { chatModel } from '../models/Chat';
 
-export const getChatsChannel = async (req) => {
+export const getChatsParent = async (req) => {
   try {
     const id = req.params === undefined ? req.id : req.params.id;
-    const chats = await chatModel.find({ channel_id: id });
+    const chats = await chatModel.find({ parent_id: id });
     return chats;
   } catch (error) {
     throw boom.boomify(error);
@@ -20,7 +20,7 @@ export const addChat = async (req) => {
       name: request.name,
       message: request.message,
       created: new Date(),
-      channel_id: request.channel_id,
+      parent_id: request.parent_id,
       user_id: request.user_id,
       imageData: request.imageData,
       imageTitle: request.imageTitle,

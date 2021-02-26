@@ -40,7 +40,7 @@ export const allQuery = `
           imageData
           imageTitle
           created
-          channel_id
+          parent_id
           user {
             _id
             name
@@ -48,6 +48,42 @@ export const allQuery = `
             imageConvertedToBase64
           }
         }
+      }
+    }
+  }
+`;
+
+export const dmsQuery = `
+  {
+    dms {
+      _id
+      chats {
+        name
+        message
+        imageData
+        imageTitle
+        created
+        parent_id
+        user {
+          _id
+          name
+          is_anonymous
+          imageConvertedToBase64
+        }
+      }
+      fromUser {
+        _id
+        name
+        email
+        is_anonymous
+        imageConvertedToBase64
+      }
+      toUser {
+        _id
+        name
+        email
+        is_anonymous
+        imageConvertedToBase64
       }
     }
   }

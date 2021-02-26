@@ -3,8 +3,8 @@ export type Chat = {
   name: string;
   message: string;
   created: Date;
-  channelId: string;
-  channel_id?: string;
+  parentId: string;
+  parent_id?: string;
 };
 
 export type Channel = {

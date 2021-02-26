@@ -6,16 +6,18 @@ export const sendMessageMutation = gql`
     $message: String!
     $imageData: String!
     $imageTitle: String!
-    $channelId: ID!
+    $parentId: ID!
     $userId: ID!
+    $isOpeningChannelChatNow: Boolean!
   ) {
     addChat(
       name: $name
       message: $message
       imageData: $imageData
       imageTitle: $imageTitle
-      channel_id: $channelId
+      parent_id: $parentId
       user_id: $userId
+      isOpeningChannelChatNow: $isOpeningChannelChatNow
     ) {
       _id
       name
@@ -23,7 +25,7 @@ export const sendMessageMutation = gql`
       imageData
       imageTitle
       created
-      channel_id
+      parent_id
       user_id
     }
   }
@@ -44,6 +46,30 @@ export const createNewCategory = gql`
     createCategory(name: $name) {
       _id
       name
+    }
+  }
+`;
+
+export const startDm = gql`
+  mutation startDm(
+    $fromUserId: ID!
+    $toUserId: ID!
+    $name: String!
+    $message: String!
+    $imageData: String!
+    $imageTitle: String!
+  ) {
+    startDm(
+      from_user_id: $fromUserId
+      to_user_id: $toUserId
+      name: $name
+      message: $message
+      imageData: $imageData
+      imageTitle: $imageTitle
+    ) {
+      _id
+      from_user_id
+      to_user_id
     }
   }
 `;

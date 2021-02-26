@@ -55,7 +55,7 @@ const routes = (fastify) => {
     {
       method: 'GET' as 'GET',
       url: '/api/chat/:id',
-      handler: chatController.getChatsChannel,
+      handler: chatController.getChatsParent,
     },
     {
       method: 'POST' as 'POST',

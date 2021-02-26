@@ -26,6 +26,7 @@ import * as categoryController from '../controllers/categoryController';
 import * as channelController from '../controllers/channelController';
 import * as chatController from '../controllers/chatController';
 import * as userController from '../controllers/userController';
+import * as dmController from '../controllers/dmController';
 
 // GraphQL オブジェクト型を宣言します。
 // これは、パラメータとしてオブジェクトを受け取り、
@@ -48,6 +49,34 @@ const userType = new GraphQLObjectType({
   }),
 });
 
+const dmType = new GraphQLObjectType({
+  name: 'Dm',
+  fields: () => ({
+    _id: { type: GraphQLID },
+    from_user_id: { type: GraphQLID },
+    to_user_id: { type: GraphQLID },
+    created: { type: GraphQLString },
+    chats: {
+      type: new GraphQLList(chatType),
+      async resolve(parent, args) {
+        return await chatController.getChatsParent({ id: parent._id });
+      },
+    },
+    fromUser: {
+      type: userType,
+      async resolve(parent, args) {
+        return await userController.getSingleUser({ id: parent.from_user_id });
+      },
+    },
+    toUser: {
+      type: userType,
+      async resolve(parent, args) {
+        return await userController.getSingleUser({ id: parent.to_user_id });
+      },
+    },
+  }),
+});
+
 const chatType = new GraphQLObjectType({
   name: 'Chat',
   fields: () => ({
@@ -57,7 +86,7 @@ const chatType = new GraphQLObjectType({
     created: { type: GraphQLString },
     imageData: { type: GraphQLString },
     imageTitle: { type: GraphQLString },
-    channel_id: { type: GraphQLID },
+    parent_id: { type: GraphQLID },
     user_id: { type: GraphQLID },
     user: {
       type: userType,
@@ -84,7 +113,7 @@ const channelType = new GraphQLObjectType({
     chats: {
       type: new GraphQLList(chatType),
       async resolve(parent, args) {
-        return await chatController.getChatsChannel({ id: parent._id });
+        return await chatController.getChatsParent({ id: parent._id });
       },
     },
   }),
@@ -110,6 +139,12 @@ const categoryType = new GraphQLObjectType({
 const RootQuery = new GraphQLObjectType({
   name: 'RootQueryType',
   fields: {
+    dms: {
+      type: GraphQLList(dmType),
+      async resolve(parent, args) {
+        return await dmController.getAllDm();
+      },
+    },
     users: {
       type: GraphQLList(userType),
       async resolve(parent, args) {
@@ -173,6 +208,30 @@ const Mutations = new GraphQLObjectType({
         return data;
       },
     },
+    startDm: {
+      type: dmType,
+      args: {
+        from_user_id: { type: GraphQLID },
+        to_user_id: { type: GraphQLID },
+        name: { type: new GraphQLNonNull(GraphQLString) },
+        message: { type: new GraphQLNonNull(GraphQLString) },
+        imageData: { type: GraphQLString },
+        imageTitle: { type: GraphQLString },
+      },
+      async resolve(parent, args) {
+        const createdDm = await dmController.createDm({
+          from_user_id: args.from_user_id,
+          to_user_id: args.to_user_id,
+        });
+        await chatController.addChat({
+          parent_id: createdDm._id,
+          user_id: args.from_user_id,
+          ...args,
+        });
+        fetchLatestAllDm();
+        return createdDm;
+      },
+    },
     deleteChat: {
       type: chatType,
       args: {
@@ -203,12 +262,16 @@ const Mutations = new GraphQLObjectType({
         message: { type: new GraphQLNonNull(GraphQLString) },
         imageData: { type: GraphQLString },
         imageTitle: { type: GraphQLString },
-        channel_id: { type: GraphQLID },
+        parent_id: { type: GraphQLID },
         user_id: { type: GraphQLID },
+        isOpeningChannelChatNow: { type: GraphQLBoolean },
       },
       async resolve(parent, args) {
         const data = await chatController.addChat(args);
-        fetchLatestAllData();
+        console.log(data);
+        args.isOpeningChannelChatNow
+          ? fetchLatestAllData()
+          : fetchLatestAllDm();
         return data;
       },
     },
@@ -220,7 +283,7 @@ const Mutations = new GraphQLObjectType({
       },
       async resolve(parent, args) {
         const data = await channelController.createNewChannel(args);
-        fetchLatestCategories();
+        fetchLatestAllData();
         return data;
       },
     },
@@ -232,12 +295,24 @@ const Mutations = new GraphQLObjectType({
       async resolve(parent, args) {
         const data = await categoryController.createNewCategory(args);
         // ここでwebsocketを使って最新のカテゴリーデータをクライアントに送信
-        fetchLatestCategories();
+        fetchLatestAllData();
         return data;
       },
     },
   },
 });
+
+const fetchLatestAllDm = async () => {
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: queries.dmsQuery }),
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      io.emit('latestDMs', JSON.stringify(data));
+    });
+};
 
 const fetchLatestAllData = async () => {
   await fetch(url, {

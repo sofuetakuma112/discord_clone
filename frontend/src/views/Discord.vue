@@ -1,14 +1,149 @@
 <template>
   <div class="root">
-    <Header :greyBackGround="greyBackGround" :channel="channel" />
+    <Header :greyBackGround="greyBackGround" :channel="currentChannelData" />
     <LeftSidebar
       :darkBackGround="darkBackGround"
       :allData="allData"
-      @showChat="showChat"
-      @openAddChannelModal="openAddChannelModal"
-      @openCreateCategoryModal="createCategoryModal = true"
+      @goServer="currentView = 1"
+      @goHome="goHome"
+    >
+      <template v-slot:content>
+        <template v-if="currentView === 1">
+          <v-sheet
+            color="grey lighten-5 mb-5"
+            height="50"
+            width="100%"
+            :elevation="5"
+            style="padding-left: 70px"
+          >
+            <v-row
+              class="server-title-row"
+              no-gutters
+              justify="space-between"
+              :style="darkBackGround"
+            >
+              <h3 class="server-title white--text pl-4">テストサーバー</h3>
+              <v-menu offset-y>
+                <template v-slot:activator="{ on, attrs }">
+                  <v-btn
+                    v-bind="attrs"
+                    v-on="on"
+                    :elevation="0"
+                    color="#2f3136"
+                    height="50"
+                  >
+                    <v-icon color="white" medium>mdi-plus</v-icon>
+                  </v-btn>
+                </template>
+                <v-list class="pa-0">
+                  <v-list-item @click="createCategoryModal = true">
+                    <v-list-item-title>カテゴリーを新規作成</v-list-item-title>
+                  </v-list-item>
+                </v-list>
+              </v-menu>
+            </v-row>
+          </v-sheet>
+
+          <v-expansion-panels
+            focusable
+            flat
+            accordion
+            multiple
+            style="padding-left: 70px"
+            shaped
+          >
+            <v-expansion-panel v-for="category in allData" :key="category._id">
+              <v-expansion-panel-header
+                class="px-4 grey--text"
+                :style="darkBackGround"
+                hide-actions
+              >
+                <span class="category-title">{{ category.name }}</span>
+                <v-icon
+                  color="grey"
+                  medium
+                  dense
+                  @click.stop="openAddChannelModal(category._id)"
+                  >mdi-plus</v-icon
+                >
+              </v-expansion-panel-header>
+              <v-expansion-panel-content :style="darkBackGround">
+                <v-list>
+                  <v-list-item
+                    v-for="channel in category.channels"
+                    :key="channel._id"
+                    link
+                    @click="showChat(channel._id, true)"
+                  >
+                    <v-list-item-content>
+                      <v-list-item-title class="grey--text"
+                        ># {{ channel.name }}</v-list-item-title
+                      >
+                    </v-list-item-content>
+                  </v-list-item>
+                </v-list>
+              </v-expansion-panel-content>
+            </v-expansion-panel>
+          </v-expansion-panels>
+        </template>
+        <template v-if="currentView === 2">
+          <v-sheet
+            color="grey lighten-5 mb-5"
+            height="50"
+            width="100%"
+            :elevation="5"
+            style="padding-left: 70px"
+          >
+            <div class="participate-or-create-dm">
+              <button type="text" class="participate-or-create-dm">
+                会話に参加または作成する
+              </button>
+            </div>
+          </v-sheet>
+
+          <v-expansion-panels
+            focusable
+            flat
+            accordion
+            style="padding-left: 70px"
+            shaped
+          >
+            <v-expansion-panel>
+              <v-expansion-panel-header
+                class="px-4 grey--text"
+                :style="darkBackGround"
+                hide-actions
+              >
+                <span class="category-title">ダイレクトメッセージ</span>
+                <v-icon color="grey" medium dense>mdi-plus</v-icon>
+              </v-expansion-panel-header>
+              <v-expansion-panel-content :style="darkBackGround">
+                <v-list>
+                  <v-list-item
+                    v-for="dm in dms"
+                    :key="dm._id"
+                    link
+                    @click="showChat(dm._id, false)"
+                  >
+                    <v-list-item-content>
+                      <v-list-item-title class="grey--text"
+                        ># {{ dm.toUser.name }}</v-list-item-title
+                      >
+                    </v-list-item-content>
+                  </v-list-item>
+                </v-list>
+              </v-expansion-panel-content>
+            </v-expansion-panel>
+          </v-expansion-panels>
+        </template>
+      </template>
+    </LeftSidebar>
+    <RightSidebar
+      :darkBackGround="darkBackGround"
+      :users="users"
+      v-if="currentView === 1"
+      @submitDB="submitDB"
     />
-    <RightSidebar :darkBackGround="darkBackGround" :users="users" />
     <Chat
       :greyBackGround="greyBackGround"
       :chats="chats"
@@ -18,9 +153,10 @@
     <Footer
       @send="send"
       @imageFileSelectedInChatForm="imageFileSelectedInChatForm"
-      :isShowAnyChannel="selectedChannelId.length !== 0"
+      :isShowAnyChannel="selectedChannelOrDmID.length !== 0"
       v-model="chatInput"
     />
+    <!-- <Card /> -->
     <ImageModal :image="currentOpeningModalImageData" v-model="imageModal" />
     <Modal
       v-model="uploadImageModal"
@@ -105,6 +241,7 @@ import Chat from '@/components/Chat.vue';
 import Footer from '@/components/Footer.vue';
 import Modal from '@/components/Modal.vue';
 import ImageModal from '@/components/ImageModal.vue';
+// import Card from '@/components/Card.vue';
 import * as queries from '@/graphql/query';
 import * as mutations from '@/graphql/mutation';
 // import { io, Socket } from 'socket.io-client';
@@ -121,7 +258,7 @@ type DataType = {
   uploadImageModal: boolean;
   imageModal: boolean;
   selectedCategoryId: string;
-  selectedChannelId: string;
+  selectedChannelOrDmID: string;
   users: types.User[];
   chatInput: string;
   channelNameInput: string;
@@ -131,6 +268,9 @@ type DataType = {
   comment: string;
   currentOpeningModalImageData: string;
   allData: any;
+  currentView: number;
+  dms: any;
+  isOpeningChannelChatNow: boolean;
 };
 
 type Image = {
@@ -148,6 +288,7 @@ export default Vue.extend({
     Footer,
     Modal,
     ImageModal,
+    // Card,
   },
   data(): DataType {
     return {
@@ -165,12 +306,13 @@ export default Vue.extend({
       chats: [],
       categories: [],
       users: [],
+      dms: [],
       createChannelModal: false,
       createCategoryModal: false,
       uploadImageModal: false,
       imageModal: false,
       selectedCategoryId: '',
-      selectedChannelId: '',
+      selectedChannelOrDmID: '',
       chatInput: '',
       imageFiles: [],
       currentImageFile: {
@@ -183,6 +325,8 @@ export default Vue.extend({
       categoryNameInput: '',
       currentOpeningModalImageData: '',
       allData: [],
+      currentView: 1,
+      isOpeningChannelChatNow: false,
     };
   },
   props: {
@@ -195,6 +339,15 @@ export default Vue.extend({
     user(): types.User {
       return this.$store.getters.getUser;
     },
+    currentChannelData(): any {
+      for (const category of this.allData) {
+        const channel = category.channels.find((channel: types.Channel) => {
+          return channel._id === this.selectedChannelOrDmID;
+        });
+        if (channel) return channel;
+      }
+      return {};
+    },
   },
   async created() {
     if (!Object.keys(this.user).length) this.$router.push({ name: 'Login' });
@@ -206,6 +359,7 @@ export default Vue.extend({
     });
     this.socket.on('latestCategories', (response: any) => {
       const parsedData = JSON.parse(response);
+      console.log(parsedData);
       this.categories = [];
       this.categories = parsedData.data.categories;
     });
@@ -215,7 +369,7 @@ export default Vue.extend({
       this.allData = parsedData.data.categories;
       for (const category of this.allData) {
         const selectedChannelNewData = category.channels.find(
-          (channel: any) => channel._id === this.selectedChannelId
+          (channel: any) => channel._id === this.selectedChannelOrDmID
         );
         if (selectedChannelNewData !== undefined) {
           this.chats = [];
@@ -227,6 +381,25 @@ export default Vue.extend({
         }
       }
     });
+    this.socket.on('latestDMs', (response: any) => {
+      const parsedData = JSON.parse(response);
+      this.dms = parsedData.data.dms;
+      const selectedNewDmData = this.dms.find(
+        (dm: any) => dm._id === this.selectedChannelOrDmID
+      );
+      if (selectedNewDmData !== undefined) {
+        this.chats = [];
+        this.chats = selectedNewDmData.chats.map((chat: types.Chat) => ({
+          ...chat,
+          created: this.formDate(new Date(Number(chat.created))),
+        }));
+      }
+    });
+
+    const allDm = await this.$apollo.query({
+      query: queries.dmsQuery,
+    });
+    this.dms = allDm.data.dms;
 
     const allData = await this.$apollo.query({
       query: queries.allQuery,
@@ -235,15 +408,7 @@ export default Vue.extend({
 
     // userデータの取得
     const response = await this.$apollo.query(queries.usersQuery);
-    console.log(response.data);
     this.users = response.data.users;
-
-    // try {
-    //   const response = await this.$apollo.query(queries.categoriesQuery);
-    //   this.categories = response.data.categories;
-    // } catch (error) {
-    //   console.log(error.message);
-    // }
   },
   watch: {
     $route(to) {
@@ -253,6 +418,23 @@ export default Vue.extend({
     },
   },
   methods: {
+    goHome() {
+      this.currentView = 2;
+    },
+    async submitDB(messageData: any) {
+      await this.$apollo.mutate({
+        mutation: mutations.startDm,
+        variables: {
+          name: messageData.from.name,
+          message: messageData.message,
+          imageData: '',
+          imageTitle: '',
+          fromUserId: messageData.from._id,
+          toUserId: messageData.to._id,
+        },
+      });
+      this.currentView = 2;
+    },
     openImageModal(imageData: string) {
       this.imageModal = true;
       this.currentOpeningModalImageData = imageData;
@@ -279,8 +461,9 @@ export default Vue.extend({
             message: this.comment,
             imageData: this.currentImageFile.imageData,
             imageTitle: this.currentImageFile.imageTitle,
-            channelId: this.selectedChannelId,
+            parentId: this.selectedChannelOrDmID,
             userId: this.user._id,
+            isOpeningChannelChatNow: this.isOpeningChannelChatNow,
           },
         });
         if (this.imageFiles.length !== 0) {
@@ -290,19 +473,31 @@ export default Vue.extend({
         }
       }
     },
-    async showChat(channelId: string) {
-      if (this.selectedChannelId === channelId) return;
-      this.selectedChannelId = channelId;
-      for (const category of this.allData) {
-        const selectedChannel = category.channels.find(
-          (channel: types.Channel) => channel._id === channelId
-        );
-        if (selectedChannel) {
-          this.chats = selectedChannel.chats.map((chat: types.Chat) => ({
+    async showChat(channelOrDmId: string, isSearchInChannel: boolean) {
+      this.isOpeningChannelChatNow = isSearchInChannel;
+      if (this.selectedChannelOrDmID === channelOrDmId) return;
+      this.selectedChannelOrDmID = channelOrDmId;
+      if (isSearchInChannel) {
+        // チャンネル内を検索
+        for (const category of this.allData) {
+          const selectedChannel = category.channels.find(
+            (channel: types.Channel) => channel._id === channelOrDmId
+          );
+          if (selectedChannel) {
+            this.chats = selectedChannel.chats.map((chat: types.Chat) => ({
+              ...chat,
+              created: this.formDate(new Date(Number(chat.created))),
+            }));
+            break;
+          }
+        }
+      } else {
+        const selectedDm = this.dms.find((dm: any) => dm._id === channelOrDmId);
+        if (selectedDm) {
+          this.chats = selectedDm.chats.map((chat: types.Chat) => ({
             ...chat,
             created: this.formDate(new Date(Number(chat.created))),
           }));
-          break;
         }
       }
       this.refs.chatInstance.scrollBottom();
@@ -315,8 +510,9 @@ export default Vue.extend({
           message: this.chatInput,
           imageData: '',
           imageTitle: '',
-          channelId: this.selectedChannelId,
+          parentId: this.selectedChannelOrDmID,
           userId: this.user._id,
+          isOpeningChannelChatNow: this.isOpeningChannelChatNow,
         },
       });
       this.chatInput = '';
@@ -367,22 +563,6 @@ export default Vue.extend({
   background: #36393f;
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-/*スクロールバーの軌道*/
-::-webkit-scrollbar-track {
-  border-radius: 10px;
-  box-shadow: inset 0 0 6px #202225;
-}
-
-/*スクロールバーの動く部分*/
-::-webkit-scrollbar-thumb {
-  background-color: #202225;
-  border-radius: 10px;
-}
-
 .modal-title {
   text-align: center;
   width: 100%;
@@ -429,5 +609,72 @@ export default Vue.extend({
   height: 22px;
   white-space: nowrap;
   color: #fff;
+}
+
+.category-title {
+  width: 100%;
+}
+
+.server-title {
+  height: 100%;
+  line-height: 50px;
+}
+
+.server-title-row {
+  background: #2f3136;
+}
+
+.participate-or-create-dm {
+  background-color: #2f3136;
+  z-index: 2;
+  -webkit-box-flex: 0;
+  -ms-flex: 0 0 auto;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  height: 100%;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  -webkit-box-shadow: 0 1px 0 rgba(4, 4, 5, 0.2), 0 1.5px 0 rgba(6, 6, 7, 0.05),
+    0 2px 0 rgba(4, 4, 5, 0.05);
+  box-shadow: 0 1px 0 rgba(4, 4, 5, 0.2), 0 1.5px 0 rgba(6, 6, 7, 0.05),
+    0 2px 0 rgba(4, 4, 5, 0.05);
+  display: flex;
+  align-items: center;
+}
+
+.participate-or-create-dm button {
+  width: 100%;
+  height: 28px;
+  overflow: hidden;
+  border-radius: 4px;
+  background-color: #202225;
+  -webkit-box-shadow: none;
+  box-shadow: none;
+  color: #72767d;
+  text-align: left;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 24px;
+  white-space: nowrap;
+}
+</style>
+
+<style>
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+/*スクロールバーの軌道*/
+::-webkit-scrollbar-track {
+  border-radius: 10px;
+  box-shadow: inset 0 0 6px #202225;
+}
+
+/*スクロールバーの動く部分*/
+::-webkit-scrollbar-thumb {
+  background-color: #202225;
+  border-radius: 10px;
 }
 </style>
