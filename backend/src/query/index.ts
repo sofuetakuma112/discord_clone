@@ -57,7 +57,9 @@ export const dmsQuery = `
   {
     dms {
       _id
+      userIds
       chats {
+        _id
         name
         message
         imageData
@@ -71,14 +73,7 @@ export const dmsQuery = `
           imageConvertedToBase64
         }
       }
-      fromUser {
-        _id
-        name
-        email
-        is_anonymous
-        imageConvertedToBase64
-      }
-      toUser {
+      users {
         _id
         name
         email

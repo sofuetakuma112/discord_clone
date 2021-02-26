@@ -68,10 +68,9 @@
                         <v-list-item-title class="white--text"
                           >{{ chat.name
                           }}<span class="date">{{
-                            chat.created
+                            formDate(new Date(Number(chat.created)))
                           }}</span></v-list-item-title
                         >
-
                         <v-list-item-subtitle
                           class="white--text"
                           v-if="!(editChatId === chat._id)"
@@ -105,9 +104,8 @@
                       </v-list-item-content>
                     </v-col>
                   </div>
-                  <template v-if="chat.imageData.length !== 0">
+                  <template v-show="chat.imageData.length !== 0">
                     <v-img
-                      lazy-src="https://picsum.photos/id/11/10/6"
                       max-height="300"
                       max-width="250"
                       :src="chat.imageData"
@@ -281,7 +279,6 @@ export default Vue.extend({
       this.$emit('openImageModal', imageData);
     },
     edit(id: string, message: string) {
-      this.editChatId = '';
       this.editChatId = id;
       this.editChatMessage = message;
     },
@@ -299,6 +296,7 @@ export default Vue.extend({
       this.editChatId = '';
     },
     showDeleteModal(chat: any) {
+      console.log(chat);
       this.deleteChat = { ...chat };
       this.isModalOpen = true;
     },
@@ -311,6 +309,15 @@ export default Vue.extend({
         },
       });
       this.isModalOpen = false;
+    },
+    formDate(date: Date) {
+      let format = 'YYYY-MM-DD hh:mm';
+      format = format.replace(/YYYY/g, String(date.getFullYear()));
+      format = format.replace(/MM/g, ('0' + (date.getMonth() + 1)).slice(-2));
+      format = format.replace(/DD/g, ('0' + date.getDate()).slice(-2));
+      format = format.replace(/hh/g, ('0' + date.getHours()).slice(-2));
+      format = format.replace(/mm/g, ('0' + date.getMinutes()).slice(-2));
+      return format;
     },
   },
 });

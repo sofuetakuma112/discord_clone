@@ -53,8 +53,7 @@ const dmType = new GraphQLObjectType({
   name: 'Dm',
   fields: () => ({
     _id: { type: GraphQLID },
-    from_user_id: { type: GraphQLID },
-    to_user_id: { type: GraphQLID },
+    userIds: { type: GraphQLList(GraphQLID) },
     created: { type: GraphQLString },
     chats: {
       type: new GraphQLList(chatType),
@@ -62,16 +61,10 @@ const dmType = new GraphQLObjectType({
         return await chatController.getChatsParent({ id: parent._id });
       },
     },
-    fromUser: {
-      type: userType,
+    users: {
+      type: GraphQLList(userType),
       async resolve(parent, args) {
-        return await userController.getSingleUser({ id: parent.from_user_id });
-      },
-    },
-    toUser: {
-      type: userType,
-      async resolve(parent, args) {
-        return await userController.getSingleUser({ id: parent.to_user_id });
+        return await userController.getUsers({ ids: parent.userIds });
       },
     },
   }),
@@ -211,6 +204,7 @@ const Mutations = new GraphQLObjectType({
     startDm: {
       type: dmType,
       args: {
+        userIds: { type: GraphQLList(GraphQLID) },
         from_user_id: { type: GraphQLID },
         to_user_id: { type: GraphQLID },
         name: { type: new GraphQLNonNull(GraphQLString) },
@@ -220,13 +214,12 @@ const Mutations = new GraphQLObjectType({
       },
       async resolve(parent, args) {
         const createdDm = await dmController.createDm({
-          from_user_id: args.from_user_id,
-          to_user_id: args.to_user_id,
+          userIds: args.userIds,
         });
         await chatController.addChat({
+          ...args,
           parent_id: createdDm._id,
           user_id: args.from_user_id,
-          ...args,
         });
         fetchLatestAllDm();
         return createdDm;
@@ -240,6 +233,7 @@ const Mutations = new GraphQLObjectType({
       async resolve(parent, args) {
         const data = await chatController.deleteChat(args);
         fetchLatestAllData();
+        fetchLatestAllDm()
         return data;
       },
     },
@@ -252,6 +246,7 @@ const Mutations = new GraphQLObjectType({
       async resolve(parent, args) {
         const data = await chatController.editChat(args);
         fetchLatestAllData();
+        fetchLatestAllDm()
         return data;
       },
     },
@@ -268,7 +263,6 @@ const Mutations = new GraphQLObjectType({
       },
       async resolve(parent, args) {
         const data = await chatController.addChat(args);
-        console.log(data);
         args.isOpeningChannelChatNow
           ? fetchLatestAllData()
           : fetchLatestAllDm();
@@ -313,6 +307,8 @@ const fetchLatestAllDm = async () => {
       io.emit('latestDMs', JSON.stringify(data));
     });
 };
+
+// fetchLatestAllDm()
 
 const fetchLatestAllData = async () => {
   await fetch(url, {

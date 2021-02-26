@@ -125,11 +125,45 @@
                     link
                     @click="showChat(dm._id, false)"
                   >
-                    <v-list-item-content>
-                      <v-list-item-title class="grey--text"
-                        ># {{ dm.toUser.name }}</v-list-item-title
-                      >
-                    </v-list-item-content>
+                    <v-row
+                      v-for="user in usersExcludingMyself(dm.users)"
+                      :key="user._id"
+                      class="d-flex"
+                      no-gutters
+                    >
+                      <v-col class="pa-0" cols="3">
+                        <v-list-item-avatar class="mr-2">
+                          <template
+                            v-if="
+                              !toBoolean(user.is_anonymous) &&
+                                user.imageConvertedToBase64.length !== 0
+                            "
+                          >
+                            <img
+                              :src="user.imageConvertedToBase64"
+                              alt=""
+                              class="avatar-img"
+                            />
+                          </template>
+                          <template v-else>
+                            <img
+                              src="../assets/anonymous.png"
+                              class="avatar-img"
+                            />
+                          </template>
+                        </v-list-item-avatar>
+                      </v-col>
+
+                      <v-col class="pa-0">
+                        <div class="dm-list-user-name">
+                          <v-list-item-content>
+                            <v-list-item-title class="grey--text">
+                              {{ user.name }}
+                            </v-list-item-title>
+                          </v-list-item-content>
+                        </div>
+                      </v-col>
+                    </v-row>
                   </v-list-item>
                 </v-list>
               </v-expansion-panel-content>
@@ -142,7 +176,7 @@
       :darkBackGround="darkBackGround"
       :users="users"
       v-if="currentView === 1"
-      @submitDB="submitDB"
+      @submitDM="submitDM"
     />
     <Chat
       :greyBackGround="greyBackGround"
@@ -353,13 +387,11 @@ export default Vue.extend({
     if (!Object.keys(this.user).length) this.$router.push({ name: 'Login' });
     this.socket.on('latestUsers', (response: any) => {
       const parsedData = JSON.parse(response);
-      console.log(parsedData);
       this.users = [];
       this.users = parsedData.data.users;
     });
     this.socket.on('latestCategories', (response: any) => {
       const parsedData = JSON.parse(response);
-      console.log(parsedData);
       this.categories = [];
       this.categories = parsedData.data.categories;
     });
@@ -373,10 +405,7 @@ export default Vue.extend({
         );
         if (selectedChannelNewData !== undefined) {
           this.chats = [];
-          this.chats = selectedChannelNewData.chats.map((chat: types.Chat) => ({
-            ...chat,
-            created: this.formDate(new Date(Number(chat.created))),
-          }));
+          this.chats = selectedChannelNewData.chats;
           break;
         }
       }
@@ -389,10 +418,7 @@ export default Vue.extend({
       );
       if (selectedNewDmData !== undefined) {
         this.chats = [];
-        this.chats = selectedNewDmData.chats.map((chat: types.Chat) => ({
-          ...chat,
-          created: this.formDate(new Date(Number(chat.created))),
-        }));
+        this.chats = selectedNewDmData.chats;
       }
     });
 
@@ -409,6 +435,11 @@ export default Vue.extend({
     // userデータの取得
     const response = await this.$apollo.query(queries.usersQuery);
     this.users = response.data.users;
+
+    // const allQueries = await this.$apollo.query(
+    //   queries.getQueryFields,
+    // );
+    // console.log(allQueries)
   },
   watch: {
     $route(to) {
@@ -418,10 +449,16 @@ export default Vue.extend({
     },
   },
   methods: {
+    usersExcludingMyself(users: types.User[]) {
+      const filteredUsers = users.filter((user) => {
+        return user._id !== this.user._id;
+      });
+      return filteredUsers;
+    },
     goHome() {
       this.currentView = 2;
     },
-    async submitDB(messageData: any) {
+    async submitDM(messageData: any) {
       await this.$apollo.mutate({
         mutation: mutations.startDm,
         variables: {
@@ -429,6 +466,7 @@ export default Vue.extend({
           message: messageData.message,
           imageData: '',
           imageTitle: '',
+          userIds: [messageData.from._id, messageData.to._id],
           fromUserId: messageData.from._id,
           toUserId: messageData.to._id,
         },
@@ -475,6 +513,7 @@ export default Vue.extend({
     },
     async showChat(channelOrDmId: string, isSearchInChannel: boolean) {
       this.isOpeningChannelChatNow = isSearchInChannel;
+      // 同じparentIdのものをクリックした場合、何もしない
       if (this.selectedChannelOrDmID === channelOrDmId) return;
       this.selectedChannelOrDmID = channelOrDmId;
       if (isSearchInChannel) {
@@ -484,21 +523,13 @@ export default Vue.extend({
             (channel: types.Channel) => channel._id === channelOrDmId
           );
           if (selectedChannel) {
-            this.chats = selectedChannel.chats.map((chat: types.Chat) => ({
-              ...chat,
-              created: this.formDate(new Date(Number(chat.created))),
-            }));
+            this.chats = selectedChannel.chats;
             break;
           }
         }
       } else {
-        const selectedDm = this.dms.find((dm: any) => dm._id === channelOrDmId);
-        if (selectedDm) {
-          this.chats = selectedDm.chats.map((chat: types.Chat) => ({
-            ...chat,
-            created: this.formDate(new Date(Number(chat.created))),
-          }));
-        }
+        // DM内を検索
+        this.chats = this.dms.find((dm: any) => dm._id === channelOrDmId).chats;
       }
       this.refs.chatInstance.scrollBottom();
     },
@@ -539,14 +570,8 @@ export default Vue.extend({
       this.createChannelModal = true;
       this.selectedCategoryId = categoryId;
     },
-    formDate(date: Date) {
-      let format = 'YYYY-MM-DD hh:mm';
-      format = format.replace(/YYYY/g, String(date.getFullYear()));
-      format = format.replace(/MM/g, ('0' + (date.getMonth() + 1)).slice(-2));
-      format = format.replace(/DD/g, ('0' + date.getDate()).slice(-2));
-      format = format.replace(/hh/g, ('0' + date.getHours()).slice(-2));
-      format = format.replace(/mm/g, ('0' + date.getMinutes()).slice(-2));
-      return format;
+    toBoolean(booleanStr: string): boolean {
+      return booleanStr.toLowerCase() === 'true';
     },
   },
 });
@@ -554,6 +579,17 @@ export default Vue.extend({
 
 <style scoped>
 .root {
+  height: 100%;
+}
+
+.avatar-img {
+  width: 32px;
+  height: 32px;
+}
+
+.dm-list-user-name {
+  display: flex;
+  align-items: center;
   height: 100%;
 }
 

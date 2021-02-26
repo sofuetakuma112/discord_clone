@@ -116,7 +116,7 @@ export default Vue.extend({
       return booleanStr.toLowerCase() === 'true';
     },
     submitDM(messageData: any) {
-      this.$emit('submitDB', messageData);
+      this.$emit('submitDM', messageData);
     },
   },
 });

@@ -35,7 +35,9 @@ export const dmsQuery = gql`
   {
     dms {
       _id
+      userIds
       chats {
+        _id
         name
         message
         imageData
@@ -49,14 +51,7 @@ export const dmsQuery = gql`
           imageConvertedToBase64
         }
       }
-      fromUser {
-        _id
-        name
-        email
-        is_anonymous
-        imageConvertedToBase64
-      }
-      toUser {
+      users {
         _id
         name
         email
@@ -117,6 +112,24 @@ export const usersQuery = {
         email
         is_anonymous
         imageConvertedToBase64
+      }
+    }
+  `,
+};
+
+export const getQueryFields = {
+  query: gql`
+    {
+      __schema {
+        queryType {
+          fields {
+            name
+            type {
+              name
+              kind
+            }
+          }
+        }
       }
     }
   `,

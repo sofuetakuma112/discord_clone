@@ -11,6 +11,7 @@
         class="d-block text-center mx-auto mt-4"
         color="grey darken-1"
         size="48"
+        style="cursor: pointer"
         @click="goHome"
         ><v-icon dark>
           fab fa-discord
@@ -25,6 +26,7 @@
           color="grey lighten-1"
           size="48"
           :class="{ 'on-hover': hover }"
+          style="cursor: pointer"
           @click="goServer"
           ><img
             alt="Avatar"
@@ -76,6 +78,7 @@ export default Vue.extend({
 }
 
 .v-navigation-drawer.v-navigation-drawer--absolute.v-navigation-drawer--mini-variant.v-navigation-drawer--open.theme--light {
+  z-index: 5;
   width: 70px !important;
 }
 

@@ -52,6 +52,7 @@ export const createNewCategory = gql`
 
 export const startDm = gql`
   mutation startDm(
+    $userIds: [ID]!
     $fromUserId: ID!
     $toUserId: ID!
     $name: String!
@@ -60,6 +61,7 @@ export const startDm = gql`
     $imageTitle: String!
   ) {
     startDm(
+      userIds: $userIds
       from_user_id: $fromUserId
       to_user_id: $toUserId
       name: $name
@@ -68,8 +70,7 @@ export const startDm = gql`
       imageTitle: $imageTitle
     ) {
       _id
-      from_user_id
-      to_user_id
+      userIds
     }
   }
 `;

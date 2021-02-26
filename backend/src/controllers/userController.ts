@@ -15,6 +15,14 @@ export const getAllUsers = async () => {
   return users;
 };
 
+export const getUsers = async (req) => {
+  const ids = req.params === undefined ? req.ids : req.params.ids;
+  const users = await userModel.find({
+    _id: { $in: ids },
+  });
+  return users;
+};
+
 export const authenticateSingleUser = async (req) => {
   try {
     const request = req.body === undefined ? req : req.body;

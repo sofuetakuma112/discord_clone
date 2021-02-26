@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
 export const dmSchema = new mongoose.Schema({
-  from_user_id: mongoose.Schema.Types.ObjectId,
-  to_user_id: mongoose.Schema.Types.ObjectId,
+  userIds: Array,
+  created: Date,
   lastUpdated: Date,
 });
 
