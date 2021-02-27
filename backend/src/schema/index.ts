@@ -102,6 +102,7 @@ const channelType = new GraphQLObjectType({
   fields: () => ({
     _id: { type: GraphQLID },
     name: { type: GraphQLString },
+    type: { type: GraphQLString },
     category_id: { type: GraphQLID },
     chats: {
       type: new GraphQLList(chatType),
@@ -233,7 +234,7 @@ const Mutations = new GraphQLObjectType({
       async resolve(parent, args) {
         const data = await chatController.deleteChat(args);
         fetchLatestAllData();
-        fetchLatestAllDm()
+        fetchLatestAllDm();
         return data;
       },
     },
@@ -246,7 +247,7 @@ const Mutations = new GraphQLObjectType({
       async resolve(parent, args) {
         const data = await chatController.editChat(args);
         fetchLatestAllData();
-        fetchLatestAllDm()
+        fetchLatestAllDm();
         return data;
       },
     },
@@ -274,6 +275,7 @@ const Mutations = new GraphQLObjectType({
       args: {
         name: { type: new GraphQLNonNull(GraphQLString) },
         category_id: { type: GraphQLID },
+        type: { type: GraphQLString },
       },
       async resolve(parent, args) {
         const data = await channelController.createNewChannel(args);
@@ -296,6 +298,18 @@ const Mutations = new GraphQLObjectType({
   },
 });
 
+const Subscription = new GraphQLObjectType({
+  name: 'Subscription',
+  fields: {
+    user: {
+      type: userType,
+      async resolve(parent, args, { pubsub }) {
+        //
+      },
+    },
+  },
+});
+
 const fetchLatestAllDm = async () => {
   await fetch(url, {
     method: 'POST',
@@ -307,8 +321,6 @@ const fetchLatestAllDm = async () => {
       io.emit('latestDMs', JSON.stringify(data));
     });
 };
-
-// fetchLatestAllDm()
 
 const fetchLatestAllData = async () => {
   await fetch(url, {
@@ -338,4 +350,5 @@ const fetchLatestCategories = async () => {
 export const schema = new GraphQLSchema({
   query: RootQuery,
   mutation: Mutations,
+  subscription: Subscription,
 });

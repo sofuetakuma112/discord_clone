@@ -32,11 +32,12 @@ export const sendMessageMutation = gql`
 `;
 
 export const createNewChannel = gql`
-  mutation createChannel($name: String!, $categoryId: ID!) {
-    createChannel(name: $name, category_id: $categoryId) {
+  mutation createChannel($name: String!, $categoryId: ID!, $type: String!) {
+    createChannel(name: $name, category_id: $categoryId, type: $type) {
       _id
       name
       category_id
+      type
     }
   }
 `;

@@ -8,6 +8,7 @@ export const allQuery = gql`
       channels {
         _id
         name
+        type
         category_id
         chats {
           _id

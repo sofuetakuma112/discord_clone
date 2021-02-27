@@ -32,6 +32,7 @@ export const allQuery = `
       channels {
         _id
         name
+        type
         category_id
         chats {
           _id

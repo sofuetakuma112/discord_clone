@@ -11,6 +11,15 @@ import * as userController from './controllers/userController';
 
 io.on('connection', (socket) => {
   console.log(`${socket.id} connected!`);
+  console.log('connection : ', socket.id);
+
+  // signalingデータ受信時の処理
+  socket.on('signaling', (objData) => {
+    console.log('signaling : ', socket.id);
+    console.log('- type : ', objData.type);
+    // 送信元以外の全員に送信
+    socket.broadcast.emit('signaling', objData);
+  });
   socket.on('disconnect', () => {
     userController.deleteAnonymousUser(socket.id);
     console.log(socket.id, 'deleted!');
@@ -60,7 +69,7 @@ fastify
               is_anonymous: user.is_anonymous,
               status: 1,
               socket_id: '',
-            })
+            });
           } else {
             // 不正なトークンでアクセスしている
             reply.send({ status: 2, message: '不正なトークンです' });
@@ -109,6 +118,7 @@ async function validate(username, password, req, reply) {
 fastify.register(qql, {
   schema,
   graphiql: true,
+  // subscription: true
 });
 
 fastify.after(() => {

@@ -26,8 +26,8 @@ export const getSingleChannel = async (req) => {
 // requestにcategory_idも含める
 export const createNewChannel = async (req) => {
   try {
-    const reqest = req.body === undefined ? req : req.body;
-    const channel = new channelModel(reqest);
+    const request = req.body === undefined ? req : req.body;
+    const channel = new channelModel(request);
     const newChannel = await channel.save();
     return newChannel;
   } catch (error) {

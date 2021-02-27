@@ -52,8 +52,6 @@ export const authenticateSingleUser = async (req) => {
 
       const tokenAndHash = rememberToken + '|' + hash;
 
-      console.log(user);
-
       return {
         _id: user[0]._id,
         name: user[0].name,

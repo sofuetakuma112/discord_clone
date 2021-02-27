@@ -31,3 +31,8 @@ export type User = {
   password?: string;
   imageConvertedToBase64?: string;
 };
+
+export type Device = {
+  text: string;
+  value: string;
+};
