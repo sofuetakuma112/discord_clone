@@ -104,10 +104,17 @@ const channelType = new GraphQLObjectType({
     name: { type: GraphQLString },
     type: { type: GraphQLString },
     category_id: { type: GraphQLID },
+    connectingUserIds: { type: GraphQLList(GraphQLID) },
     chats: {
       type: new GraphQLList(chatType),
       async resolve(parent, args) {
         return await chatController.getChatsParent({ id: parent._id });
+      },
+    },
+    connectingUsers: {
+      type: GraphQLList(userType),
+      async resolve(parent, args) {
+        return await userController.getUsers({ ids: parent.connectingUserIds });
       },
     },
   }),
@@ -279,6 +286,32 @@ const Mutations = new GraphQLObjectType({
       },
       async resolve(parent, args) {
         const data = await channelController.createNewChannel(args);
+        fetchLatestAllData();
+        return data;
+      },
+    },
+    updateChannel: {
+      type: channelType,
+      args: {
+        name: { type: new GraphQLNonNull(GraphQLString) },
+        channel_id: { type: GraphQLID },
+        type: { type: GraphQLString },
+        user_id: { type: GraphQLID },
+      },
+      async resolve(parent, args) {
+        const data = await channelController.updateChannel(args);
+        fetchLatestAllData();
+        return data;
+      },
+    },
+    deleteUserFromVoiceChannel: {
+      type: channelType,
+      args: {
+        channel_id: { type: GraphQLID },
+        user_id: { type: GraphQLID },
+      },
+      async resolve(parent, args) {
+        const data = await channelController.deleteUserFromVoiceChannel(args);
         fetchLatestAllData();
         return data;
       },

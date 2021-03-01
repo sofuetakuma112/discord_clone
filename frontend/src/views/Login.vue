@@ -97,9 +97,6 @@ export default Vue.extend({
       errorMessage: '',
     };
   },
-  props: {
-    socket: Object,
-  },
   methods: {
     async login() {
       if (
@@ -138,7 +135,7 @@ export default Vue.extend({
             password: '',
             imageConvertedToBase64: '',
             isAnonymous: true,
-            socketId: this.socket.id,
+            socketId: this.$socket.id,
           },
         });
         this.$store.commit('updateUser', {

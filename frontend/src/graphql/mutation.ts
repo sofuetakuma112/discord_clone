@@ -42,6 +42,46 @@ export const createNewChannel = gql`
   }
 `;
 
+export const updateChannel = gql`
+  mutation updateChannel(
+    $name: String!
+    $type: String!
+    $channelId: ID!
+    $userId: ID!
+  ) {
+    updateChannel(
+      name: $name
+      channel_id: $channelId
+      type: $type
+      user_id: $userId
+    ) {
+      _id
+      name
+      category_id
+      type
+      connectingUserIds
+    }
+  }
+`;
+
+export const deleteUserFromVoiceChannel = gql`
+  mutation deleteUserFromVoiceChannel(
+    $channelId: ID!
+    $userId: ID!
+  ) {
+    deleteUserFromVoiceChannel(
+      channel_id: $channelId
+      user_id: $userId
+    ) {
+      _id
+      name
+      category_id
+      type
+      connectingUserIds
+    }
+  }
+`;
+
 export const createNewCategory = gql`
   mutation createCategory($name: String!) {
     createCategory(name: $name) {

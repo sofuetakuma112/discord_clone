@@ -27,9 +27,50 @@ export const getSingleChannel = async (req) => {
 export const createNewChannel = async (req) => {
   try {
     const request = req.body === undefined ? req : req.body;
-    const channel = new channelModel(request);
+    const channel = new channelModel({
+      ...request,
+      connectingUserIds: [],
+    });
     const newChannel = await channel.save();
     return newChannel;
+  } catch (error) {
+    throw boom.boomify(error);
+  }
+};
+
+export const updateChannel = async (req) => {
+  try {
+    const request = req.body === undefined ? req : req.body;
+    if (request.type === '2') {
+      // ボイスチャンネルにユーザーが接続しようとしている
+      const result = await channelModel.updateOne(
+        { _id: request.channel_id },
+        {
+          $addToSet: {
+            connectingUserIds: request.user_id,
+          },
+        }
+      );
+      return result;
+    }
+    return;
+  } catch (error) {
+    throw boom.boomify(error);
+  }
+};
+
+export const deleteUserFromVoiceChannel = async (req) => {
+  try {
+    const request = req.body === undefined ? req : req.body;
+    const result = await channelModel.updateOne(
+      { _id: request.channel_id },
+      {
+        $pull: {
+          connectingUserIds: request.user_id,
+        },
+      }
+    );
+    return result;
   } catch (error) {
     throw boom.boomify(error);
   }

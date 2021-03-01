@@ -1,7 +1,7 @@
 <template>
   <v-app id="inspire">
     <v-main>
-      <router-view :socket="socket"></router-view>
+      <router-view></router-view>
     </v-main>
   </v-app>
 </template>
@@ -9,21 +9,9 @@
 <script lang="ts">
 import Vue from 'vue';
 import api from '@/api/index';
-import { io, Socket } from 'socket.io-client';
-
-type DataType = {
-  socket: Socket | null;
-};
 
 export default Vue.extend({
-  data(): DataType {
-    return {
-      socket: null,
-    };
-  },
   async created() {
-    this.socket = io('http://0.0.0.0:3000');
-
     if (localStorage.tokenAndHash) {
       api()
         .post('/auth', { tokenAndHash: localStorage.tokenAndHash })

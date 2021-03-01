@@ -36,21 +36,78 @@
     </v-navigation-drawer>
 
     <slot name="content"></slot>
+
+    <div class="user-container d-flex">
+      <div class="user-icon my-auto mx-2">
+        <v-avatar size="32"
+          ><img
+            :src="user.imageConvertedToBase64"
+            alt=""
+            height="32px"
+            width="32px"
+        /></v-avatar>
+      </div>
+      <div class="user-info my-auto">
+        <p class="user-name">{{ user.name }}</p>
+        <p class="user-id">{{ user._id }}</p>
+      </div>
+      <div class="d-flex my-auto">
+        <v-btn icon height="32px" width="32px" @click="isMicMute = !isMicMute"
+          ><v-icon v-if="!isMicMute" dark size="32px" dense small color="#b9bbbe"
+            >fas fa-microphone</v-icon
+          ><v-icon v-else dark size="32px" dense small color="#b9bbbe"
+            >fas fa-microphone-slash</v-icon
+          ></v-btn
+        >
+        <v-btn
+          icon
+          height="32px"
+          width="32px"
+          @click="isSpeakerMute = !isSpeakerMute"
+        >
+          <v-icon v-if="!isSpeakerMute" dark size="32px" dense small color="#b9bbbe"
+            >fas fa-volume-up</v-icon
+          ><v-icon v-else dark size="32px" dense small color="#b9bbbe"
+            >fas fa-volume-off</v-icon
+          >
+        </v-btn>
+        <v-btn
+          icon
+          height="32px"
+          width="32px"
+          @click="hangUp"
+          :disabled="currentVoiceChannelId.length === 0"
+          ><v-icon dark size="32px" dense small color="#b9bbbe">
+            fas fa-phone-slash
+          </v-icon></v-btn
+        >
+      </div>
+    </div>
   </v-navigation-drawer>
 </template>
 
 <script lang="ts">
 import Vue from 'vue';
+import * as types from '@/types/index.d.ts';
 
 export default Vue.extend({
   data() {
     return {
       drawer: null,
+      isMicMute: false,
+      isSpeakerMute: false,
+      isSettingOpen: false,
     };
   },
   props: {
     darkBackGround: Object,
     allData: Array,
+    currentVoiceChannelId: String,
+  },
+  computed: {
+    user(): types.User {
+      return this.$store.getters.getUser;
+    },
   },
   methods: {
     showChat(channelId: string) {
@@ -68,9 +125,56 @@ export default Vue.extend({
     goServer() {
       this.$emit('goServer');
     },
+    hangUp() {
+      this.$emit('hangUp');
+    },
   },
 });
 </script>
+
+<style scoped>
+.user-container {
+  padding-left: 70px;
+  height: 53px;
+  background-color: #292b2f;
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+}
+
+.user-icon {
+  max-width: 32px;
+}
+
+.user-info p {
+  margin: 0;
+  padding: 0;
+  max-width: 84px;
+}
+
+.user-name {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  line-height: 18px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+}
+
+.user-id {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  color: #b9bbbe;
+  line-height: 13px;
+  font-size: 12px;
+}
+
+.device-checkbox {
+  max-width: 96px;
+}
+</style>
 
 <style>
 .theme--light.v-navigation-drawer .v-divider {

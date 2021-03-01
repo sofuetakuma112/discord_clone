@@ -11,6 +11,8 @@ export type Channel = {
   name: string;
   _id: string;
   categoryId: string;
+  connectingUserIds: string[];
+  type: string;
 };
 
 export type BackgroundStyle = {

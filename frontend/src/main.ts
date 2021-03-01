@@ -4,6 +4,7 @@ import router from './router';
 import store from './store';
 import vuetify from './plugins/vuetify';
 import VueApollo from 'vue-apollo';
+import { io, Socket } from 'socket.io-client';
 
 // Apollo Clientは、ReactやAngularなどの統合機能を備えた、
 // フル機能を備えたキャッシング用のGraphQLクライアントです。
@@ -13,6 +14,7 @@ import ApolloClient from 'apollo-boost';
 Vue.use(VueApollo);
 
 Vue.config.productionTip = false;
+Vue.prototype.$socket = io('http://0.0.0.0:3000');
 
 // Create Apollo Client
 const client = new ApolloClient({
@@ -24,14 +26,11 @@ const apolloProvider = new VueApollo({
   defaultClient: client,
 });
 
-// router.beforeEach((to, from, next) => {
-//   if (to.matched.some((record) => record.meta.requiresAuth)) {
-//     console.log(store.getters.getUser)
-//     if (store.getters.getUser) next()
-//     else next('/login')
-//   }
-//   next();
-// });
+declare module 'vue/types/vue' {
+  interface Vue {
+    $socket: Socket;
+  }
+}
 
 new Vue({
   store,

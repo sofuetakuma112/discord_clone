@@ -8,10 +8,22 @@ import crypto from 'crypto';
 import { userModel } from './models/User';
 import { io } from './server';
 import * as userController from './controllers/userController';
+import * as channelController from './controllers/channelController';
+
+const userIdsConnectingVoiceChannel: any = [];
 
 io.on('connection', (socket) => {
   console.log(`${socket.id} connected!`);
   console.log('connection : ', socket.id);
+
+  socket.on('connectVoiceChannel', (data) => {
+    userIdsConnectingVoiceChannel.push({
+      socketId: socket.id,
+      userId: data.userId,
+      channelId: data.channelId,
+    });
+    console.log(userIdsConnectingVoiceChannel);
+  });
 
   // signalingデータ受信時の処理
   socket.on('signaling', (objData) => {
@@ -21,6 +33,15 @@ io.on('connection', (socket) => {
     socket.broadcast.emit('signaling', objData);
   });
   socket.on('disconnect', () => {
+    const userData = userIdsConnectingVoiceChannel.find(
+      (userIdData) => userIdData.socketId === socket.id
+    );
+    if (userData) {
+      channelController.deleteUserFromVoiceChannel({
+        channel_id: userData.channelId,
+        user_id: userData.userId,
+      });
+    }
     userController.deleteAnonymousUser(socket.id);
     console.log(socket.id, 'deleted!');
   });

@@ -33,6 +33,7 @@ export const allQuery = `
         _id
         name
         type
+        connectingUserIds
         category_id
         chats {
           _id
@@ -48,6 +49,13 @@ export const allQuery = `
             is_anonymous
             imageConvertedToBase64
           }
+        }
+        connectingUsers {
+          _id
+          name
+          email
+          is_anonymous
+          imageConvertedToBase64
         }
       }
     }

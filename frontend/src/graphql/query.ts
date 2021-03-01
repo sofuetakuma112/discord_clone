@@ -9,6 +9,7 @@ export const allQuery = gql`
         _id
         name
         type
+        connectingUserIds
         category_id
         chats {
           _id
@@ -26,6 +27,13 @@ export const allQuery = gql`
             is_anonymous
             imageConvertedToBase64
           }
+        }
+        connectingUsers {
+          _id
+          name
+          email
+          is_anonymous
+          imageConvertedToBase64
         }
       }
     }

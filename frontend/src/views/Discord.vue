@@ -6,6 +6,8 @@
       :allData="allData"
       @goServer="currentView = 1"
       @goHome="goHome"
+      @hangUp="hangUp"
+      :currentVoiceChannelId="currentVoiceChannelId"
     >
       <template v-slot:content>
         <template v-if="currentView === 1">
@@ -82,18 +84,33 @@
                         >
                       </v-list-item-content>
                     </v-list-item>
-                    <v-list-item
-                      v-else
-                      :key="channel._id"
-                      link
-                      @click="connectVoiceChannel(channel._id)"
-                    >
-                      <v-list-item-content>
-                        <v-list-item-title class="grey--text">{{
-                          channel.name
-                        }}</v-list-item-title>
-                      </v-list-item-content>
-                    </v-list-item>
+                    <div v-else :key="channel._id">
+                      <v-list-item link @click="connectVoiceChannel(channel)">
+                        <v-list-item-content>
+                          <v-list-item-title class="grey--text"
+                            ><v-icon color="#72767d" dense small class="pr-2"
+                              >fas fa-volume-up</v-icon
+                            >
+                            {{ channel.name }}</v-list-item-title
+                          >
+                        </v-list-item-content>
+                      </v-list-item>
+                      <v-list class="py-0 pl-5" dense>
+                        <v-list-item
+                          v-for="user in channel.connectingUsers"
+                          :key="user._id"
+                        >
+                          <v-list-item-avatar size="24">
+                            <img :src="user.imageConvertedToBase64" alt="" />
+                          </v-list-item-avatar>
+                          <v-list-item-content>
+                            <v-list-item-title class="grey--text">{{
+                              user.name
+                            }}</v-list-item-title>
+                          </v-list-item-content>
+                        </v-list-item>
+                      </v-list>
+                    </div>
                   </template>
                 </v-list>
               </v-expansion-panel-content>
@@ -216,6 +233,41 @@
       v-if="currentView === 1"
       @submitDM="submitDM"
     />
+    <!-- <div class="video-chat">
+      <input
+        type="checkbox"
+        id="checkbox_camera"
+        v-model="cameraCheckBoxState"
+        @change="onclickCheckbox_CameraMicrophone"
+      />Camera
+      <input
+        type="checkbox"
+        id="checkbox_microphone"
+        v-model="audioCheckBoxState"
+        @change="onclickCheckbox_CameraMicrophone"
+      />Microphone
+      <br />
+      <video
+        id="video_local"
+        width="320"
+        height="240"
+        style="border: 1px solid black;"
+        autoplay
+        :srcObject.prop="localStream"
+      ></video>
+      <video
+        id="video_remote"
+        style="width: 320px; height: 240px; border: 1px solid black;"
+        autoplay
+        :srcObject.prop="remoteStreamForVideo"
+      ></video
+      ><audio
+        id="audio_remote"
+        :srcObject.prop="remoteStreamForAudio"
+        autoplay
+      ></audio>
+      <v-btn @click="onclickButton_SendOfferSDP">Send OfferSDP.</v-btn>
+    </div> -->
     <Chat
       :greyBackGround="greyBackGround"
       :chats="chats"
@@ -228,7 +280,6 @@
       :isShowAnyChannel="selectedChannelOrDmID.length !== 0"
       v-model="chatInput"
     />
-    <video autoplay :srcObject.prop="localStream"></video>
     <ImageModal :image="currentOpeningModalImageData" v-model="imageModal" />
     <Modal
       v-model="uploadImageModal"
@@ -320,10 +371,8 @@ import Chat from '@/components/Chat.vue';
 import Footer from '@/components/Footer.vue';
 import Modal from '@/components/Modal.vue';
 import ImageModal from '@/components/ImageModal.vue';
-// import Card from '@/components/Card.vue';
 import * as queries from '@/graphql/query';
 import * as mutations from '@/graphql/mutation';
-// import { io, Socket } from 'socket.io-client';
 import * as types from '@/types/index';
 
 type DataType = {
@@ -356,9 +405,15 @@ type DataType = {
   selectedAudio: string;
   selectedVideo: string;
   localStream: MediaStream | null;
+  remoteStreamForVideo: MediaStream | null;
+  remoteStreamForAudio: MediaStream | null;
   isMuteVideo: boolean;
   isMuteAudio: boolean;
-  globalRtcPeerConnection: any;
+  peerConnections: any;
+  cameraCheckBoxState: boolean;
+  audioCheckBoxState: false;
+  rtcPeerConnection: any;
+  currentVoiceChannelId: string;
 };
 
 type Image = {
@@ -371,6 +426,8 @@ type sdpDataAndType = {
   type: string;
   data: any;
 };
+
+const config = { iceServers: [] };
 
 export default Vue.extend({
   components: {
@@ -395,6 +452,8 @@ export default Vue.extend({
         name: '',
         _id: '',
         categoryId: '',
+        connectingUserIds: [],
+        type: '',
       },
       chats: [],
       categories: [],
@@ -425,14 +484,17 @@ export default Vue.extend({
       videoDeviceLists: [],
       selectedAudio: '',
       selectedVideo: '',
-      localStream: null,
       isMuteAudio: false,
       isMuteVideo: false,
-      globalRtcPeerConnection: null,
+      peerConnections: {},
+      localStream: null,
+      remoteStreamForVideo: null,
+      remoteStreamForAudio: null,
+      cameraCheckBoxState: false,
+      audioCheckBoxState: false,
+      rtcPeerConnection: new RTCPeerConnection(config),
+      currentVoiceChannelId: '',
     };
-  },
-  props: {
-    socket: Object,
   },
   computed: {
     refs(): any {
@@ -453,17 +515,17 @@ export default Vue.extend({
   },
   async created() {
     if (!Object.keys(this.user).length) this.$router.push({ name: 'Login' });
-    this.socket.on('latestUsers', (response: any) => {
+    this.$socket.on('latestUsers', (response: any) => {
       const parsedData = JSON.parse(response);
       this.users = [];
       this.users = parsedData.data.users;
     });
-    this.socket.on('latestCategories', (response: any) => {
+    this.$socket.on('latestCategories', (response: any) => {
       const parsedData = JSON.parse(response);
       this.categories = [];
       this.categories = parsedData.data.categories;
     });
-    this.socket.on('latestData', (response: any) => {
+    this.$socket.on('latestData', (response: any) => {
       const parsedData = JSON.parse(response);
       this.allData = [];
       this.allData = parsedData.data.categories;
@@ -478,7 +540,7 @@ export default Vue.extend({
         }
       }
     });
-    this.socket.on('latestDMs', (response: any) => {
+    this.$socket.on('latestDMs', (response: any) => {
       const parsedData = JSON.parse(response);
       this.dms = parsedData.data.dms.filter((dm: any) =>
         dm.userIds.some((userId: string) => userId === this.user._id)
@@ -491,6 +553,50 @@ export default Vue.extend({
         this.chats = selectedNewDmData.chats;
       }
     });
+    this.$socket.on('signaling', (objData: sdpDataAndType) => {
+      console.log('Socket Event : signaling');
+      console.log('- type : ', objData.type);
+      console.log('- data : ', objData.data);
+
+      // OfferSDPをリモートへ、作成したAnswerSDPをローカルへセット
+      if ('offer' === objData.type) {
+        // onclickButton_SetOfferSDPandCreateAnswerSDP()と同様の処理
+
+        // RTCPeerConnectionオブジェクトの作成
+        console.log('Call : createPeerConnection()');
+        this.createPeerConnection();
+
+        // OfferSDPの設定とAnswerSDPの作成
+        console.log('Call : setOfferSDP_and_createAnswerSDP()');
+        // 受信したOfferSDPオブジェクトを渡す。
+        this.setOfferSDP_and_createAnswerSDP(objData.data);
+
+        // AnserSDPをリモートへセットする
+      } else if ('answer' === objData.type) {
+        // onclickButton_SetAnswerSDPthenChatStarts()と同様の処理
+        // 設定するAnswerSDPとして、テキストエリアのデータではなく、受信したデータを使用する。
+
+        if (!this.rtcPeerConnection) {
+          // コネクションオブジェクトがない
+          console.log(
+            '\u001b[31m' + 'Connection object does not exist.' + '\u001b[0m'
+          );
+          return;
+        }
+
+        // AnswerSDPの設定
+        console.log('Call : setAnswerSDP()');
+        this.setAnswerSDP(objData.data); // 受信したSDPオブジェクトを渡す。
+      } else {
+        console.error('Unexpected : Socket Event : signaling');
+      }
+    });
+
+    // this.$socket.on('disconnect', () => {
+    //   if (this.currentVoiceChannelId.length !== 0) {
+    //     this.hangUp()
+    //   }
+    // });
 
     const allDm = await this.$apollo.query({
       query: queries.dmsQuery,
@@ -508,58 +614,7 @@ export default Vue.extend({
     const response = await this.$apollo.query(queries.usersQuery);
     this.users = response.data.users;
 
-    this.socket.on('signaling', (objData: sdpDataAndType) => {
-      console.log('Socket Event : signaling');
-      console.log('- type : ', objData.type);
-      console.log('- data : ', objData.data);
-
-      if ('offer' === objData.type) {
-        // onclickButton_SetOfferSDPandCreateAnswerSDP()と同様の処理
-        // 設定するOffserSDPとして、テキストエリアのデータではなく、受信したデータを使用する。
-
-        if (this.globalRtcPeerConnection) {
-          // 既にコネクションオブジェクトあり
-          alert('Connection object already exists.');
-          return;
-        }
-
-        // RTCPeerConnectionオブジェクトの作成
-        const rtcPeerConnection = this.createPeerConnection(
-          this.localStream as MediaStream
-        );
-        this.globalRtcPeerConnection = rtcPeerConnection; // グローバル変数に設定
-
-        // OfferSDPの設定とAnswerSDPの作成
-        this.setOfferSDPAndCreateAnswerSDP(rtcPeerConnection, objData.data); // 受信したSDPオブジェクトを渡す。
-      } else if ('answer' === objData.type) {
-        // onclickButton_SetAnswerSDPthenChatStarts()と同様の処理
-        // 設定するAnswerSDPとして、テキストエリアのデータではなく、受信したデータを使用する。
-
-        if (!this.globalRtcPeerConnection) {
-          // コネクションオブジェクトがない
-          alert('Connection object does not exist.');
-          return;
-        }
-
-        // AnswerSDPの設定
-        console.log('Call : setAnswerSDP()');
-        this.setAnswerSDP(this.globalRtcPeerConnection, objData.data); // 受信したSDPオブジェクトを渡す。
-      } else if ('candidate' === objData.type) {
-        if (!this.globalRtcPeerConnection) {
-          // コネクションオブジェクトがない
-          alert('Connection object does not exist.');
-          return;
-        }
-
-        // Vanilla ICEの場合は、ここには来ない。
-        // Trickle ICEの場合は、相手側のICE candidateイベントで送信されたICE candidateを、コネクションに追加する。
-
-        // ICE candidateの追加
-        this.addCandidate(this.globalRtcPeerConnection, objData.data);
-      } else {
-        console.error('Unexpected : Socket Event : signaling');
-      }
-    });
+    this.getLocalDevices();
   },
   watch: {
     $route(to) {
@@ -570,8 +625,8 @@ export default Vue.extend({
   },
   methods: {
     // デバイス一覧を取得
-    getLocalDevices() {
-      navigator.mediaDevices.enumerateDevices().then((deviceInfos) => {
+    async getLocalDevices() {
+      await navigator.mediaDevices.enumerateDevices().then((deviceInfos) => {
         const audios = [{ text: '指定なし', value: '' }];
         const videos = [{ text: '指定なし', value: '' }];
         for (let i = 0; i < deviceInfos.length; i++) {
@@ -593,7 +648,7 @@ export default Vue.extend({
       });
     },
     // 選択したデバイス or 既定のデバイスを元にMediaStreamを作成
-    connectLocalCamera() {
+    async connectLocalCamera() {
       const constraints = {
         audio: this.selectedAudio
           ? { deviceId: { exact: this.selectedAudio } }
@@ -603,7 +658,7 @@ export default Vue.extend({
           : true,
       };
 
-      navigator.mediaDevices
+      await navigator.mediaDevices
         .getUserMedia(constraints)
         .then((stream) => {
           this.localStream = stream;
@@ -630,268 +685,215 @@ export default Vue.extend({
       }
       this.isMuteVideo = !this.isMuteVideo;
     },
-    connectVoiceChannel(id: string) {
-      console.log(id, 'connected!');
-
-      // デバイス一覧、ストリームの取得 + videoタグにストリームをセット
-      this.getLocalDevices();
-      this.connectLocalCamera();
-
-      if (!this.localStream) return;
-      // RTCPeerConnectionオブジェクトの作成
-      this.globalRtcPeerConnection = this.createPeerConnection(
-        this.localStream
-      );
-      // DataChannelの作成
-      const datachannel = this.globalRtcPeerConnection.createDataChannel(
-        'my datachannel'
-      );
-      // DataChannelオブジェクトをRTCPeerConnectionオブジェクトのメンバーに追加。
-      this.globalRtcPeerConnection.datachannel = datachannel;
-      // DataChannelオブジェクトのイベントハンドラの構築
-      this.setupDataChannelEventHandler(this.globalRtcPeerConnection);
-
-      // OfferSDPの作成
-      this.createOfferSDP(this.globalRtcPeerConnection);
+    connectVoiceChannel(channel: types.Channel) {
+      if (
+        !channel.connectingUserIds.some((userId) => userId === this.user._id)
+      ) {
+        this.currentVoiceChannelId = channel._id;
+        console.log(channel._id, 'connected!');
+        this.$socket.emit('connectVoiceChannel', {
+          userId: this.user._id,
+          channelId: this.currentVoiceChannelId,
+        });
+        this.$apollo.mutate({
+          mutation: mutations.updateChannel,
+          variables: {
+            name: channel.name,
+            type: channel.type,
+            channelId: channel._id,
+            userId: this.user._id,
+          },
+        });
+      }
     },
-    setupDataChannelEventHandler(rtcPeerConnection: any) {
-      if (!('datachannel' in rtcPeerConnection)) {
-        console.error('DataChannelが無いよ');
+    findUserFromUsers(userId: string) {
+      return this.users.find((userData) => userData._id === userId);
+    },
+    onclickCheckbox_CameraMicrophone() {
+      console.log('UI Event : Camera/Microphone checkbox clicked.');
+
+      // これまでの状態
+      let trackCamera_old = null;
+      let trackMicrophone_old = null;
+      let bCamera_old = false;
+      let bMicrophone_old = false;
+      if (this.localStream) {
+        trackCamera_old = this.localStream.getVideoTracks()[0];
+        if (trackCamera_old) {
+          bCamera_old = true;
+        }
+        trackMicrophone_old = this.localStream.getAudioTracks()[0];
+        if (trackMicrophone_old) {
+          bMicrophone_old = true;
+        }
+      }
+
+      // 今後の状態
+      let bCamera_new = false;
+      if (this.cameraCheckBoxState) {
+        bCamera_new = true;
+      }
+      let bMicrophone_new = false;
+      if (this.audioCheckBoxState) {
+        bMicrophone_new = true;
+      }
+
+      // 状態変化
+      console.log('Camera :  %s => %s', bCamera_old, bCamera_new);
+      console.log('Microphoneo : %s = %s', bMicrophone_old, bMicrophone_new);
+
+      if (bCamera_old === bCamera_new && bMicrophone_old === bMicrophone_new) {
+        // チェックボックスの状態の変化なし
         return;
       }
 
-      // message イベントが発生したときのイベントハンドラ
-      // socket.IOでSDPの交換等を行うのでここは使用しない
-      rtcPeerConnection.datachannel.onmessage = (event: any) => {
-        console.log('DataChannel Event : message');
-        const objData = JSON.parse(event.data);
-        console.log('- type : ', objData.type);
-        console.log('- data : ', objData.data);
+      // 古いメディアストリームのトラックの停止（トラックの停止をせず、HTML要素のstreamの解除だけではカメラは停止しない（カメラ動作LEDは点いたまま））
+      if (trackCamera_old) {
+        console.log('Call : trackCamera_old.stop()');
+        trackCamera_old.stop();
+      }
+      if (trackMicrophone_old) {
+        console.log('Call : trackMicrophone_old.stop()');
+        trackMicrophone_old.stop();
+      }
+      // HTML要素のメディアストリームの解除
+      this.localStream = null;
 
-        // if ('message' === objData.type) {
-        //   // 受信メッセージをメッセージテキストエリアへ追加
-        //   let strMessage = objData.data;
-        //   console.log(strMessage);
-        // } else if ('offer' === objData.type) {
-        //   // 受信したOfferSDPの設定とAnswerSDPの作成
-        //   console.log('Call : setOfferSDPAndCreateAnswerSDP()');
-        //   this.setOfferSDPAndCreateAnswerSDP(rtcPeerConnection, objData.data);
-        // } else if ('answer' === objData.type) {
-        //   // 受信したAnswerSDPの設定
-        //   console.log('Call : setAnswerSDP()');
-        //   this.setAnswerSDP(rtcPeerConnection, objData.data);
-        // } else if ('candidate' === objData.type) {
-        //   // 受信したICE candidateの追加
-        //   console.log('Call : addCandidate()');
-        //   this.addCandidate(rtcPeerConnection, objData.data);
-        // } else if ('leave' === objData.type) {
-        //   // チャット離脱の通知を受信したときの処理を追加します。
-        //   // 「コネクションの終了処理」の関数を呼び出します。
-        //   console.log('Call : endPeerConnection()');
-        //   this.endPeerConnection(rtcPeerConnection);
-        // }
-      };
-    },
-    createOfferSDP(rtcPeerConnection: any) {
-      // OfferSDPの作成
-      rtcPeerConnection
-        .createOffer()
-        .then((sessionDescription: any) => {
-          // 作成されたOfferSDPををLocalDescriptionに設定
-          // このタイミングでICE candidate の収集が始まる（収集が完了したらonicegatheringstatechangeイベント発行してテキストエリアにSDPが表示される）
-          return rtcPeerConnection.setLocalDescription(sessionDescription);
-        })
-        .then(() => {
-          // Trickle ICEの場合は、初期SDPを相手に送る
-          this.socket.emit('signaling', {
-            type: 'offer',
-            data: rtcPeerConnection.localDescription,
-          });
+      if (!bCamera_new && !bMicrophone_new) {
+        // （チェックボックスの状態の変化があり、かつ、）カメラとマイクを両方Offの場合
+        return;
+      }
+
+      // （チェックボックスの状態の変化があり、かつ、）カメラとマイクのどちらかもしくはどちらもOnの場合
+
+      // 自分のメディアストリームを取得する。
+      // - 古くは、navigator.getUserMedia() を使用していたが、廃止された。
+      //   現在は、navigator.mediaDevices.getUserMedia() が新たに用意され、これを使用する。
+      console.log(
+        'Call : navigator.mediaDevices.getUserMedia( video=%s, audio=%s )',
+        bCamera_new,
+        bMicrophone_new
+      );
+      navigator.mediaDevices
+        .getUserMedia({ video: bCamera_new, audio: bMicrophone_new })
+        .then((stream: MediaStream) => {
+          // HTML要素へのメディアストリームの設定
+          this.localStream = stream;
         })
         .catch((error: Error) => {
+          // メディアストリームの取得に失敗⇒古いメディアストリームのまま。チェックボックスの状態を戻す。
           console.error('Error : ', error);
+          alert('Could not start Camera.');
+          this.cameraCheckBoxState = false;
+          this.audioCheckBoxState = false;
+          return;
         });
     },
-    createPeerConnection(stream: MediaStream) {
+    createPeerConnection() {
       // RTCPeerConnectionオブジェクトの生成
-      const config = {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-        ],
-      };
-      const rtcPeerConnection = new RTCPeerConnection(config);
-      this.globalRtcPeerConnection = rtcPeerConnection;
-
+      // const config = { iceServers: [] };
+      // this.rtcPeerConnection = new RTCPeerConnection(config);
       // RTCPeerConnectionオブジェクトのイベントハンドラの構築
-      // ICE gathering state changeイベントハンドラについて、
-      // 「iceGatheringState」が「complete」になったときの処理として、
-      // 「収集したICE candidateを保持するSDP」をブラウザ画面の「Offer側のOfferSDP用のテキストエリア」に貼り付ける処理
-      this.setupRTCPeerConnectionEventHandler(rtcPeerConnection);
+      this.setupRTCPeerConnectionEventHandler();
 
       // RTCPeerConnectionオブジェクトのストリームにローカルのメディアストリームを追加
-      if (stream) {
-        // - 古くは、RTCPeerConnection.addStream(stream) を使用していたが、廃止予定となった。
-        //   現在は、RTCPeerConnection.addTrack(track, stream) を使用する。
-        stream.getTracks().forEach((track) => {
-          rtcPeerConnection.addTrack(track, stream);
+      if (this.localStream) {
+        this.localStream.getTracks().forEach((track: any) => {
+          this.rtcPeerConnection.addTrack(track, this.localStream);
         });
       } else {
-        console.log('No local stream.');
+        console.log('\u001b[31m' + 'No local stream.' + '\u001b[0m');
       }
-
-      return rtcPeerConnection;
     },
-    isDataChannelOpen(rtcPeerConnection: any) {
-      if (!('datachannel' in rtcPeerConnection)) {
-        // datachannelメンバーが存在しない
-        return false;
-      }
-      if (!rtcPeerConnection.datachannel) {
-        // datachannelメンバーがnull
-        return false;
-      }
-      if ('open' !== rtcPeerConnection.datachannel.readyState) {
-        // datachannelメンバーはあるが、"open"でない。
-        return false;
-      }
-      // DataCchannelが開いている
-      return true;
-    },
-    setupRTCPeerConnectionEventHandler(rtcPeerConnection: any) {
-      // Negotiation needed イベントが発生したときのイベントハンドラ
-      // - このイベントは、セッションネゴシエーションを必要とする変更が発生したときに発生する。
-      //   一部のセッション変更はアンサーとしてネゴシエートできないため、このネゴシエーションはオファー側として実行されなければならない。
-      //   最も一般的には、negotiationneededイベントは、RTCPeerConnectionに送信トラックが追加された後に発生する。
-      //   ネゴシエーションがすでに進行しているときに、ネゴシエーションを必要とする方法でセッションが変更された場合、
-      //   ネゴシエーションが完了するまで、negotiationneededイベントは発生せず、ネゴシエーションがまだ必要な場合にのみ発生する。
-      //   see : https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/onnegotiationneeded
-      rtcPeerConnection.onnegotiationneeded = () => {
+    setupRTCPeerConnectionEventHandler() {
+      this.rtcPeerConnection.onnegotiationneeded = () => {
         console.log('Event : Negotiation needed');
-
-        if (!this.isDataChannelOpen(rtcPeerConnection)) {
-          //
-        } else {
-          console.log('Call : createOfferSDP()');
-          this.createOfferSDP(rtcPeerConnection);
-        }
       };
 
-      // ICE candidate イベントが発生したときのイベントハンドラ
-      // - これは、ローカルのICEエージェントがシグナリング・サーバを介して
-      //   他のピアにメッセージを配信する必要があるときはいつでも発生する。
-      //   これにより、ブラウザ自身がシグナリングに使用されている技術についての詳細を知る必要がなく、
-      //   ICE エージェントがリモートピアとのネゴシエーションを実行できるようになる。
-      //   see : https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/onicecandidate
-      rtcPeerConnection.onicecandidate = (event: any) => {
-        console.log('Event : ICE candidate');
+      this.rtcPeerConnection.onicecandidate = (event: any) => {
+        // console.log('Event : ICE candidate');
         if (event.candidate) {
-          console.log('- ICE candidate : ', event.candidate);
-
-          this.socket.emit('signaling', {
-            type: 'candidate',
-            data: event.candidate,
-          });
-
-          // if (!this.isDataChannelOpen(rtcPeerConnection)) {
-          //   console.log('- Send ICE candidate to server');
-          //   this.g_socket.emit('signaling', {
-          //     type: 'candidate',
-          //     data: event.candidate,
-          //   });
-          // } else {
-          //   console.log('- Send ICE candidate through DataChannel');
-          //   rtcPeerConnection.datachannel.send(
-          //     JSON.stringify({ type: 'candidate', data: event.candidate })
-          //   );
-          // }
+          // ICE candidateがある
+          // console.log('- ICE candidate : ', event.candidate);
         } else {
           console.log('- ICE candidate : empty');
         }
       };
 
-      rtcPeerConnection.onicecandidateerror = (event: any) => {
+      this.rtcPeerConnection.onicecandidateerror = (event: any) => {
         console.error(
           'Event : ICE candidate error. error code : ',
           event.errorCode
         );
       };
 
-      // ICE gathering state change イベントが発生したときのイベントハンドラ
-      // - このイベントは、ICE gathering stateが変化したときに発生する。
-      //   言い換えれば、ICEエージェントがアクティブに候補者を収集しているかどうかが変化したときに発生する。
-      //   see : https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/onicegatheringstatechange
-      rtcPeerConnection.onicegatheringstatechange = () => {
+      // 収集の状態が変化したら実行されるハンドラ
+      // 収集したICE candidateを保持するSDP
+      this.rtcPeerConnection.onicegatheringstatechange = () => {
         console.log('Event : ICE gathering state change');
         console.log(
           '- ICE gathering state : ',
-          rtcPeerConnection.iceGatheringState
+          this.rtcPeerConnection.iceGatheringState
         );
 
-        if ('complete' === rtcPeerConnection.iceGatheringState) {
-          if ('offer' === rtcPeerConnection.localDescription.type) {
+        if ('complete' === this.rtcPeerConnection.iceGatheringState) {
+          // Vanilla ICEの場合は、ICE candidateを含んだOfferSDP/AnswerSDPを相手に送る
+          // Trickle ICEの場合は、何もしない
+
+          if ('offer' === this.rtcPeerConnection.localDescription.type) {
             // OfferSDPをサーバーに送信
-            //console.log( "- Send OfferSDP to server" );
-            //g_socket.emit( "signaling", { type: "offer", data: rtcPeerConnection.localDescription } );
-          } else if ('answer' === rtcPeerConnection.localDescription.type) {
+            console.log('- Send OfferSDP to server');
+            this.$socket.emit('signaling', {
+              type: 'offer',
+              data: this.rtcPeerConnection.localDescription,
+            });
+          } else if (
+            'answer' === this.rtcPeerConnection.localDescription.type
+          ) {
             // AnswerSDPをサーバーに送信
-            //console.log( "- Send AnswerSDP to server" );
-            //g_socket.emit( "signaling", { type: "answer", data: rtcPeerConnection.localDescription } );
+            console.log('- Send AnswerSDP to server');
+            this.$socket.emit('signaling', {
+              type: 'answer',
+              data: this.rtcPeerConnection.localDescription,
+            });
           } else {
             console.error(
               'Unexpected : Unknown localDescription.type. type = ',
-              rtcPeerConnection.localDescription.type
+              this.rtcPeerConnection.localDescription.type
             );
           }
         }
       };
 
-      // ICE connection state change イベントが発生したときのイベントハンドラ
-      // - このイベントは、ネゴシエーションプロセス中にICE connection stateが変化するたびに発生する。
-      // - 接続が成功すると、通常、状態は「new」から始まり、「checking」を経て、「connected」、最後に「completed」と遷移します。
-      //   ただし、特定の状況下では、「connected」がスキップされ、「checking」から「completed」に直接移行する場合があります。
-      //   これは、最後にチェックされた候補のみが成功した場合に発生する可能性があり、成功したネゴシエーションが完了する前に、
-      //   収集信号と候補終了信号の両方が発生します。
-      //   see : https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/iceconnectionstatechange_event
-      rtcPeerConnection.oniceconnectionstatechange = () => {
+      this.rtcPeerConnection.oniceconnectionstatechange = () => {
         console.log('Event : ICE connection state change');
         console.log(
           '- ICE connection state : ',
-          rtcPeerConnection.iceConnectionState
+          this.rtcPeerConnection.iceConnectionState
         );
       };
 
-      // Signaling state change イベントが発生したときのイベントハンドラ
-      // - このイベントは、ピア接続のsignalStateが変化したときに送信される。
-      //   これは、setLocalDescription（）またはsetRemoteDescription（）の呼び出しが原因で発生する可能性がある。
-      //   see : https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/onsignalingstatechange
-      rtcPeerConnection.onsignalingstatechange = () => {
+      this.rtcPeerConnection.onsignalingstatechange = () => {
         console.log('Event : Signaling state change');
-        console.log('- Signaling state : ', rtcPeerConnection.signalingState);
+        console.log(
+          '- Signaling state : ',
+          this.rtcPeerConnection.signalingState
+        );
       };
 
-      // Connection state change イベントが発生したときのイベントハンドラ
-      // - このイベントは、ピア接続の状態が変化したときに送信される。
-      //   see : https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/onconnectionstatechange
-      rtcPeerConnection.onconnectionstatechange = () => {
+      this.rtcPeerConnection.onconnectionstatechange = () => {
         console.log('Event : Connection state change');
-        console.log('- Connection state : ', rtcPeerConnection.connectionState);
-
-        if ('failed' === rtcPeerConnection.connectionState) {
-          console.log('Call : endPeerConnection()');
-          this.endPeerConnection(rtcPeerConnection);
-        }
+        console.log(
+          '- Connection state : ',
+          this.rtcPeerConnection.connectionState
+        );
       };
 
-      // Track イベントが発生したときのイベントハンドラ
       // - このイベントは、新しい着信MediaStreamTrackが作成され、
       //   コネクション上のレシーバーセットに追加されたRTCRtpReceiverオブジェクトに関連付けられたときに送信される。
-      //   see : https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/ontrack
-      // - 古くは、rtcPeerConnection.onaddstream に設定していたが、廃止された。
-      //   現在は、rtcPeerConnection.ontrack に設定する。
-      // 通信相手のMediaStreamを受け取った際に発行される？
-      rtcPeerConnection.ontrack = (event: any) => {
+      // 接続相手がRTCPeerConnectionのトラックにストリームを追加すると発行されるイベント
+      // 引数のイベントには通信相手のストリームが入っている
+      this.rtcPeerConnection.ontrack = (event: any) => {
         console.log('Event : Track');
         console.log('- stream', event.streams[0]);
         console.log('- track', event.track);
@@ -900,148 +902,79 @@ export default Vue.extend({
         const stream = event.streams[0];
         const track = event.track;
         if ('video' === track.kind) {
-          console.log('Call : setStreamToElement( Video_Remote, stream )');
-          // this.setStreamToElement(g_elementVideoRemote, stream);
+          this.remoteStreamForVideo = stream;
         } else if ('audio' === track.kind) {
-          console.log('Call : setStreamToElement( Audio_Remote, stream )');
-          // this.setStreamToElement(g_elementAudioRemote, stream);
+          this.remoteStreamForAudio = stream;
         } else {
           console.error('Unexpected : Unknown track kind : ', track.kind);
         }
-
-        // 相手のメディアストリームがRTCPeerConnectionから削除されたときのイベントハンドラ
-        // - 相手の RTCPeerConnection.removeTrack( sender );
-        //   の結果として、streamの「removetrack」イベントが発生する。
-        // - 古くは、rtcPeerConnection.onremovetrack に設定していたが、廃止された。
-        //   現在は、stream.onremovetrack に設定する。
-        // 「相手のメディアストリームがRTCPeerConnectionから削除されたときのイベントハンドラ」を追加します。
-        // 処理内容は、削除されたトラックの種類に対応したHTML要素に設定されたメディアストリームをクリアします。
-        stream.onremovetrack = (evt: any) => {
-          console.log('Stream Event : remove track');
-          console.log('- stream', stream);
-          console.log('- track', evt.track); // 映像データか音声データを判別するのに使用
-
-          // HTML要素のメディアストリームの解除
-          const trackRemove = evt.track;
-          if ('video' === trackRemove.kind) {
-            console.log('Call : setStreamToElement( Video_Remote, null )');
-            // this.setStreamToElement(g_elementVideoRemote, null);
-          } else if ('audio' === trackRemove.kind) {
-            console.log('Call : setStreamToElement( Audio_Remote, null )');
-            // this.setStreamToElement(g_elementAudioRemote, null);
-          } else {
-            console.error(
-              'Unexpected : Unknown track kind : ',
-              trackRemove.kind
-            );
-          }
-        };
-      };
-
-      // Data channel イベントが発生したときのイベントハンドラ
-      // - このイベントは、createDataChannel() を呼び出すリモートピアによって
-      //   RTCDataChannelが接続に追加されたときに送信されます。
-      //   see : https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/ondatachannel
-      // offerされる側は、相手との接続が完了すると、DataChannelイベントが発生します。
-      // DataChannelオブジェクトが手に入ります。
-      // DataChannelオブジェクトを、RTCPeerConnectionオブジェクトのメンバーに追加します。
-      // DataChannelオブジェクトのイベントハンドラを構築します。
-      // connectVoiceChannelメソッド内でrtcPeerConnectionインスタンスの作成、
-      // createDataChannel()を実行しているのでその最中に呼び出される
-      rtcPeerConnection.ondatachannel = (event: any) => {
-        console.log('Event : Data channel');
-
-        rtcPeerConnection.datachannel = event.channel;
-        console.log('Call : setupDataChannelEventHandler()');
-        this.setupDataChannelEventHandler(rtcPeerConnection);
-
-        console.log('Call : createOfferSDP()');
-        this.createOfferSDP(rtcPeerConnection);
       };
     },
-    // socketでofferSDPを受け取った際に実行される
-    setOfferSDPAndCreateAnswerSDP(
-      rtcPeerConnection: any,
-      sessionDescription: any
-    ) {
-      rtcPeerConnection
-        .setRemoteDescription(sessionDescription)
-        .then(() => {
-          // AnswerSDPの作成
-          return rtcPeerConnection.createAnswer();
-        })
+    createOfferSDP() {
+      // OfferSDPの作成
+      console.log('Call : rtcPeerConnection.createOffer()');
+      this.rtcPeerConnection
+        .createOffer()
         .then((sessionDescription: any) => {
-          // 作成されたAnswerSDPををLocalDescriptionに設定
-          return rtcPeerConnection.setLocalDescription(sessionDescription);
+          // 作成されたOfferSDPををLocalDescriptionに設定
+          console.log('Call : rtcPeerConnection.setLocalDescription()');
+          return this.rtcPeerConnection.setLocalDescription(sessionDescription);
         })
         .then(() => {
           // Vanilla ICEの場合は、まだSDPを相手に送らない
           // Trickle ICEの場合は、初期SDPを相手に送る
-
-          this.socket.emit('signaling', {
-            type: 'answer',
-            data: rtcPeerConnection.localDescription,
-          });
-
-          // if (!this.isDataChannelOpen(rtcPeerConnection)) {
-          //   // チャット前
-          //   // 初期AnswerSDPをサーバーを経由して相手に送信
-          //   // サーバーがsignalingイベントを受け取った場合、送信元以外の全員へ送信する
-          //   this.socket.emit('signaling', {
-          //     type: 'answer',
-          //     data: rtcPeerConnection.localDescription,
-          //   });
-          // } else {
-          //   // チャット中
-          //   // 初期AnswerSDPをDataChannelを通して相手に直接送信
-          //   console.log('- Send AnswerSDP through DataChannel');
-          //   rtcPeerConnection.datachannel.send(
-          //     JSON.stringify({
-          //       type: 'answer',
-          //       data: rtcPeerConnection.localDescription,
-          //     })
-          //   );
-          // }
         })
         .catch((error: Error) => {
           console.error('Error : ', error);
         });
     },
-    // 受け取ったSDPをリモートにセットする
-    setAnswerSDP(rtcPeerConnection: any, sessionDescription: any) {
+    setOfferSDP_and_createAnswerSDP(sessionDescription: any) {
       console.log('Call : rtcPeerConnection.setRemoteDescription()');
-      rtcPeerConnection
+      this.rtcPeerConnection
+        .setRemoteDescription(sessionDescription)
+        .then(() => {
+          // AnswerSDPの作成
+          console.log('Call : rtcPeerConnection.createAnswer()');
+          // このタイミングでICE candidateの収集が始まる
+          return this.rtcPeerConnection.createAnswer();
+        })
+        .then((sessionDescription: any) => {
+          // 作成されたAnswerSDPををLocalDescriptionに設定
+          console.log('Call : rtcPeerConnection.setLocalDescription()');
+          return this.rtcPeerConnection.setLocalDescription(sessionDescription);
+        })
+        .then(() => {
+          // Vanilla ICEの場合は、まだSDPを相手に送らない
+          // Trickle ICEの場合は、初期SDPを相手に送る
+        })
+        .catch((error: Error) => {
+          console.error('Error : ', error);
+        });
+    },
+    setAnswerSDP(sessionDescription: any) {
+      console.log(this.rtcPeerConnection);
+      // offerした側でanswerSDPをリモートにセットする
+      this.rtcPeerConnection
         .setRemoteDescription(sessionDescription)
         .catch((error: Error) => {
           console.error('Error : ', error);
         });
     },
-    // rtcPeerConnectionインスタンスにIceCandidateを追加
-    addCandidate(rtcPeerConnection: any, candidate: any) {
-      console.log('Call : rtcPeerConnection.addIceCandidate()');
-      rtcPeerConnection.addIceCandidate(candidate).catch((error: Error) => {
-        console.error('Error : ', error);
-      });
-    },
-    endPeerConnection(rtcPeerConnection: any) {
-      // リモート映像の停止
-      console.log('Call : setStreamToElement( Video_Remote, null )');
-      // setStreamToElement(g_elementVideoRemote, null);
-      // リモート音声の停止
-      console.log('Call : setStreamToElement( Audio_Remote, null )');
-      // setStreamToElement(g_elementAudioRemote, null);
+    onclickButton_SendOfferSDP() {
+      console.log("UI Event : 'Send OfferSDP.' button clicked.");
 
-      // DataChannelの終了
-      if ('datachannel' in rtcPeerConnection) {
-        rtcPeerConnection.datachannel.close();
-        rtcPeerConnection.datachannel = null;
-      }
+      // if (this.rtcPeerConnection) {
+      //   // 既にコネクションオブジェクトあり
+      //   alert('Connection object already exists.');
+      //   return;
+      // }
 
-      // グローバル変数から解放
-      this.globalRtcPeerConnection = null;
+      // RTCPeerConnectionオブジェクトの作成
+      console.log('Call : createPeerConnection()');
+      this.createPeerConnection();
 
-      // ピアコネクションの終了
-      rtcPeerConnection.close();
+      // OfferSDPの作成
+      this.createOfferSDP();
     },
     usersExcludingMyself(users: types.User[]) {
       const filteredUsers = users.filter((user) => {
@@ -1168,6 +1101,16 @@ export default Vue.extend({
     toBoolean(booleanStr: string): boolean {
       return booleanStr.toLowerCase() === 'true';
     },
+    hangUp() {
+      this.$apollo.mutate({
+        mutation: mutations.deleteUserFromVoiceChannel,
+        variables: {
+          channelId: this.currentVoiceChannelId,
+          userId: this.user._id,
+        },
+      });
+      this.currentVoiceChannelId = '';
+    },
   },
 });
 </script>
@@ -1289,6 +1232,14 @@ export default Vue.extend({
   font-weight: 500;
   line-height: 24px;
   white-space: nowrap;
+}
+
+.video-chat {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  background-color: #fff;
 }
 </style>
 
