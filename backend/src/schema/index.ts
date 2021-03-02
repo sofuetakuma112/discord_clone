@@ -6,6 +6,64 @@ import fetch from 'node-fetch';
 import * as queries from '../query/index';
 import { io } from '../server';
 
+const userIdsConnectingVoiceChannel: any = [];
+
+io.on('connection', (socket) => {
+  console.log(`${socket.id} connected!`);
+
+  socket.on('connectVoiceChannel', (data) => {
+    const channelAndUser = userIdsConnectingVoiceChannel.find(
+      (channelAndUserData) => channelAndUserData.channelId === data.channelId
+    );
+
+    if (channelAndUser) {
+      // 二人目以降の接続なのでofferSDPを受け取る
+      io.to(socket.id).emit('signaling', {
+        channelId: data.channelId,
+        type: channelAndUser.type,
+        data: channelAndUser.data,
+      });
+      return;
+    }
+    userIdsConnectingVoiceChannel.push({
+      socketId: socket.id,
+      userId: data.userId,
+      channelId: data.channelId,
+      type: data.type,
+      data: data.data,
+    });
+  });
+
+  // signalingデータ受信時の処理
+  socket.on('signaling', (objData) => {
+    // 送信元を除く同じチャンネル内のユーザー全てに送信
+    for (const channelAndUserData of userIdsConnectingVoiceChannel) {
+      if (channelAndUserData.channelId === objData.channelId) {
+        // アンサーSDPを送信
+        io.to(channelAndUserData.socketId).emit('signaling', objData);
+      }
+    }
+  });
+  socket.on('disconnect', () => {
+    const userData = userIdsConnectingVoiceChannel.find(
+      (userIdData) => userIdData.socketId === socket.id
+    );
+    if (userData) {
+      userIdsConnectingVoiceChannel.splice(
+        userIdsConnectingVoiceChannel.indexOf(userData),
+        1
+      );
+      channelController.deleteUserFromVoiceChannel({
+        channel_id: userData.channelId,
+        user_id: userData.userId,
+      });
+      fetchLatestAllData()
+    }
+    userController.deleteAnonymousUser(socket.id);
+    console.log(socket.id, 'deleted!');
+  });
+});
+
 const url = `http://localhost:3000/graphql`;
 
 // Destructure GraphQL functions

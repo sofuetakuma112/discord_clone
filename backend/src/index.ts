@@ -6,46 +6,6 @@ import { schema } from './schema/index';
 require('dotenv').config();
 import crypto from 'crypto';
 import { userModel } from './models/User';
-import { io } from './server';
-import * as userController from './controllers/userController';
-import * as channelController from './controllers/channelController';
-
-const userIdsConnectingVoiceChannel: any = [];
-
-io.on('connection', (socket) => {
-  console.log(`${socket.id} connected!`);
-  console.log('connection : ', socket.id);
-
-  socket.on('connectVoiceChannel', (data) => {
-    userIdsConnectingVoiceChannel.push({
-      socketId: socket.id,
-      userId: data.userId,
-      channelId: data.channelId,
-    });
-    console.log(userIdsConnectingVoiceChannel);
-  });
-
-  // signalingデータ受信時の処理
-  socket.on('signaling', (objData) => {
-    console.log('signaling : ', socket.id);
-    console.log('- type : ', objData.type);
-    // 送信元以外の全員に送信
-    socket.broadcast.emit('signaling', objData);
-  });
-  socket.on('disconnect', () => {
-    const userData = userIdsConnectingVoiceChannel.find(
-      (userIdData) => userIdData.socketId === socket.id
-    );
-    if (userData) {
-      channelController.deleteUserFromVoiceChannel({
-        channel_id: userData.channelId,
-        user_id: userData.userId,
-      });
-    }
-    userController.deleteAnonymousUser(socket.id);
-    console.log(socket.id, 'deleted!');
-  });
-});
 
 // Fastify インスタンスに機能を追加する必要がある場合、必要なのは decorate API です。
 // API を使うと、Fastify インスタンスに新しいプロパティを追加することができます

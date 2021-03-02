@@ -51,7 +51,8 @@ export const updateChannel = async (req) => {
           },
         }
       );
-      return result;
+      const updatedChannel = await channelModel.findById(request.channel_id);
+      return updatedChannel;
     }
     return;
   } catch (error) {

@@ -35,7 +35,219 @@
       </v-hover>
     </v-navigation-drawer>
 
-    <slot name="content"></slot>
+    <template v-if="currentView === 1">
+      <v-sheet
+        color="grey lighten-5 mb-5"
+        height="50"
+        width="100%"
+        :elevation="5"
+        style="padding-left: 70px"
+      >
+        <v-row
+          class="server-title-row"
+          no-gutters
+          justify="space-between"
+          :style="darkBackGround"
+        >
+          <h3 class="server-title white--text pl-4">テストサーバー</h3>
+          <v-menu offset-y>
+            <template v-slot:activator="{ on, attrs }">
+              <v-btn
+                v-bind="attrs"
+                v-on="on"
+                :elevation="0"
+                color="#2f3136"
+                height="50"
+              >
+                <v-icon color="white" medium>mdi-plus</v-icon>
+              </v-btn>
+            </template>
+            <v-list class="pa-0">
+              <v-list-item @click="createCategoryModal = true">
+                <v-list-item-title>カテゴリーを新規作成</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+        </v-row>
+      </v-sheet>
+
+      <v-expansion-panels
+        focusable
+        flat
+        accordion
+        multiple
+        style="padding-left: 70px"
+        shaped
+      >
+        <v-expansion-panel v-for="category in allData" :key="category._id">
+          <v-expansion-panel-header
+            class="px-4 grey--text"
+            :style="darkBackGround"
+            hide-actions
+          >
+            <span class="category-title">{{ category.name }}</span>
+            <v-icon
+              color="grey"
+              medium
+              dense
+              @click.stop="openAddChannelModal(category._id)"
+              >mdi-plus</v-icon
+            >
+          </v-expansion-panel-header>
+          <v-expansion-panel-content :style="darkBackGround">
+            <v-list>
+              <template v-for="channel in category.channels">
+                <v-list-item
+                  v-if="channel.type === '1'"
+                  :key="channel._id"
+                  link
+                  @click="showChat(channel._id, true)"
+                >
+                  <v-list-item-content>
+                    <v-list-item-title class="grey--text"
+                      ># {{ channel.name }}</v-list-item-title
+                    >
+                  </v-list-item-content>
+                </v-list-item>
+                <div v-else :key="channel._id">
+                  <v-list-item link @click="connectVoiceChannel(channel)">
+                    <v-list-item-content>
+                      <v-list-item-title class="grey--text"
+                        ><v-icon color="#72767d" dense small class="pr-2"
+                          >fas fa-volume-up</v-icon
+                        >
+                        {{ channel.name }}</v-list-item-title
+                      >
+                    </v-list-item-content>
+                  </v-list-item>
+                  <v-list class="py-0 pl-5" dense>
+                    <v-list-item
+                      v-for="user in channel.connectingUsers"
+                      :key="user._id"
+                    >
+                      <v-list-item-avatar size="24">
+                        <img :src="user.imageConvertedToBase64" alt="" />
+                      </v-list-item-avatar>
+                      <v-list-item-content>
+                        <v-list-item-title class="grey--text">{{
+                          user.name
+                        }}</v-list-item-title>
+                      </v-list-item-content>
+                    </v-list-item>
+                  </v-list>
+                </div>
+              </template>
+            </v-list>
+          </v-expansion-panel-content>
+        </v-expansion-panel>
+      </v-expansion-panels>
+    </template>
+    <template v-if="currentView === 2">
+      <v-sheet
+        color="grey lighten-5 mb-5"
+        height="50"
+        width="100%"
+        :elevation="5"
+        style="padding-left: 70px"
+      >
+        <div class="participate-or-create-dm">
+          <button type="text" class="participate-or-create-dm">
+            会話に参加または作成する
+          </button>
+        </div>
+      </v-sheet>
+
+      <v-expansion-panels
+        focusable
+        flat
+        accordion
+        style="padding-left: 70px"
+        shaped
+      >
+        <v-expansion-panel>
+          <v-expansion-panel-header
+            class="px-4 grey--text"
+            :style="darkBackGround"
+            hide-actions
+          >
+            <span class="category-title">ダイレクトメッセージ</span>
+            <v-icon color="grey" medium dense>mdi-plus</v-icon>
+          </v-expansion-panel-header>
+          <v-expansion-panel-content :style="darkBackGround">
+            <v-list>
+              <v-list-item
+                v-for="dm in dms"
+                :key="dm._id"
+                link
+                @click="showChat(dm._id, false)"
+              >
+                <template v-if="usersExcludingMyself(dm.users).length === 1">
+                  <v-row
+                    v-for="user in usersExcludingMyself(dm.users)"
+                    :key="user._id"
+                    class="d-flex"
+                    no-gutters
+                  >
+                    <v-col class="pa-0" cols="3">
+                      <v-list-item-avatar class="mr-2">
+                        <template
+                          v-if="
+                            !toBoolean(user.is_anonymous) &&
+                              user.imageConvertedToBase64.length !== 0
+                          "
+                        >
+                          <img
+                            :src="user.imageConvertedToBase64"
+                            alt=""
+                            class="avatar-img"
+                          />
+                        </template>
+                        <template v-else>
+                          <img
+                            src="../assets/anonymous.png"
+                            class="avatar-img"
+                          />
+                        </template>
+                      </v-list-item-avatar>
+                    </v-col>
+
+                    <v-col class="pa-0">
+                      <div class="dm-list-user-name">
+                        <v-list-item-content>
+                          <v-list-item-title class="grey--text">
+                            {{ user.name }}
+                          </v-list-item-title>
+                        </v-list-item-content>
+                      </div>
+                    </v-col>
+                  </v-row>
+                </template>
+                <template v-else>
+                  <v-row class="d-flex" no-gutters>
+                    <v-col class="pa-0" cols="3">
+                      <v-list-item-avatar class="mr-2">
+                        <v-icon>fas fa-users</v-icon>
+                      </v-list-item-avatar>
+                    </v-col>
+                    <v-col class="pa-0">
+                      <div class="dm-list-user-name">
+                        <v-list-item-content>
+                          <v-list-item-title class="grey--text">
+                            {{
+                              usersExcludingMyself(dm.users).length
+                            }}人のメンバー
+                          </v-list-item-title>
+                        </v-list-item-content>
+                      </div>
+                    </v-col>
+                  </v-row>
+                </template>
+              </v-list-item>
+            </v-list>
+          </v-expansion-panel-content>
+        </v-expansion-panel>
+      </v-expansion-panels>
+    </template>
 
     <div class="user-container d-flex">
       <div class="user-icon my-auto mx-2">
@@ -52,8 +264,14 @@
         <p class="user-id">{{ user._id }}</p>
       </div>
       <div class="d-flex my-auto">
-        <v-btn icon height="32px" width="32px" @click="isMicMute = !isMicMute"
-          ><v-icon v-if="!isMicMute" dark size="32px" dense small color="#b9bbbe"
+        <v-btn icon height="32px" width="32px" @click="changeAudioState"
+          ><v-icon
+            v-if="!isMicMute"
+            dark
+            size="32px"
+            dense
+            small
+            color="#b9bbbe"
             >fas fa-microphone</v-icon
           ><v-icon v-else dark size="32px" dense small color="#b9bbbe"
             >fas fa-microphone-slash</v-icon
@@ -65,7 +283,13 @@
           width="32px"
           @click="isSpeakerMute = !isSpeakerMute"
         >
-          <v-icon v-if="!isSpeakerMute" dark size="32px" dense small color="#b9bbbe"
+          <v-icon
+            v-if="!isSpeakerMute"
+            dark
+            size="32px"
+            dense
+            small
+            color="#b9bbbe"
             >fas fa-volume-up</v-icon
           ><v-icon v-else dark size="32px" dense small color="#b9bbbe"
             >fas fa-volume-off</v-icon
@@ -83,12 +307,31 @@
         >
       </div>
     </div>
+    <audio
+      id="audio_remote"
+      :srcObject.prop="remoteStreamForAudio"
+      autoplay
+    ></audio>
   </v-navigation-drawer>
 </template>
 
 <script lang="ts">
-import Vue from 'vue';
+import Vue, { PropType } from 'vue';
 import * as types from '@/types/index.d.ts';
+//@ts-ignore
+import joinSound from '@/assets/sounds/join.mp3';
+//@ts-ignore
+import leaveSound from '@/assets/sounds/leave.mp3';
+import * as mutations from '@/graphql/mutation';
+
+type sdpDataAndType = {
+  type: string;
+  data: any;
+  channelId: string;
+};
+
+let offerPeer: any;
+let answerPeer: any;
 
 export default Vue.extend({
   data() {
@@ -102,14 +345,254 @@ export default Vue.extend({
   props: {
     darkBackGround: Object,
     allData: Array,
-    currentVoiceChannelId: String,
+    value: String,
+    currentView: Number,
+    rtcConfiguration: Object,
+    remoteStreamForVideo: MediaStream as PropType<MediaStream | null>,
+    remoteStreamForAudio: MediaStream as PropType<MediaStream | null>,
+    localStream: MediaStream as PropType<MediaStream | null>,
+    dms: Array,
   },
   computed: {
     user(): types.User {
       return this.$store.getters.getUser;
     },
+    currentVoiceChannelId: {
+      get(): string {
+        return this.value;
+      },
+      set(value: string): void {
+        this.$emit('input', value);
+      },
+    },
+  },
+  async created() {
+    this.$socket.on('signaling', async (objData: sdpDataAndType) => {
+      console.log('- type : ', objData.type);
+      if ('offer' === objData.type) {
+        console.log('offerSDP received!');
+
+        answerPeer = new RTCPeerConnection(this.rtcConfiguration);
+
+        this.setupRTCPeerConnectionEventHandler(answerPeer);
+
+        if (this.localStream) {
+          this.localStream.getTracks().forEach((track: any) => {
+            answerPeer.addTrack(track, this.localStream);
+          });
+        } else {
+          console.log('\u001b[31m' + 'No local stream.' + '\u001b[0m');
+        }
+
+        await answerPeer.setRemoteDescription(objData.data);
+        const answer = await answerPeer.createAnswer();
+        await answerPeer.setLocalDescription(answer);
+
+        // AnserSDPをリモートへセットする
+      } else if ('answer' === objData.type) {
+        if (!offerPeer) {
+          console.log(
+            '\u001b[31m' + 'Connection object does not exist.' + '\u001b[0m'
+          );
+          return;
+        } else {
+          console.log('コネクションオブジェクト発見');
+        }
+
+        // AnswerSDPの設定
+        await offerPeer.setRemoteDescription(objData.data);
+      } else {
+        console.error('Unexpected : Socket Event : signaling');
+      }
+    });
   },
   methods: {
+    changeAudioState() {
+      this.isMicMute = !this.isMicMute;
+      console.log('UI Event : Camera/Microphone checkbox clicked.');
+
+      // これまでの状態
+      let trackCamera_old = null;
+      let trackMicrophone_old = null;
+      let bCamera_old = false;
+      let bMicrophone_old = false;
+      if (this.localStream) {
+        trackCamera_old = this.localStream.getVideoTracks()[0];
+        if (trackCamera_old) {
+          bCamera_old = true;
+        }
+        trackMicrophone_old = this.localStream.getAudioTracks()[0];
+        if (trackMicrophone_old) {
+          bMicrophone_old = true;
+        }
+      }
+
+      // 今後の状態
+      const bCamera_new = false;
+      // if (false) {
+      //   bCamera_new = true;
+      // }
+      let bMicrophone_new = false;
+      if (!this.isMicMute) {
+        bMicrophone_new = true;
+      }
+
+      // 状態変化
+      console.log('Camera :  %s => %s', bCamera_old, bCamera_new);
+      console.log('Microphoneo : %s = %s', bMicrophone_old, bMicrophone_new);
+
+      if (bCamera_old === bCamera_new && bMicrophone_old === bMicrophone_new) {
+        // チェックボックスの状態の変化なし
+        return;
+      }
+
+      // 古いメディアストリームのトラックの停止（トラックの停止をせず、HTML要素のstreamの解除だけではカメラは停止しない（カメラ動作LEDは点いたまま））
+      if (trackCamera_old) {
+        console.log('Call : trackCamera_old.stop()');
+        trackCamera_old.stop();
+      }
+      if (trackMicrophone_old) {
+        console.log('Call : trackMicrophone_old.stop()');
+        trackMicrophone_old.stop();
+      }
+      // HTML要素のメディアストリームの解除
+      // this.localStream = null;
+      this.$emit('updateLocalStream', null);
+
+      if (!bCamera_new && !bMicrophone_new) {
+        // （チェックボックスの状態の変化があり、かつ、）カメラとマイクを両方Offの場合
+        return;
+      }
+
+      // 自分のメディアストリームを取得する。
+      // - 古くは、navigator.getUserMedia() を使用していたが、廃止された。
+      //   現在は、navigator.mediaDevices.getUserMedia() が新たに用意され、これを使用する。
+      console.log(
+        'Call : navigator.mediaDevices.getUserMedia( video=%s, audio=%s )',
+        bCamera_new,
+        bMicrophone_new
+      );
+      navigator.mediaDevices
+        .getUserMedia({ video: bCamera_new, audio: bMicrophone_new })
+        .then((stream: MediaStream) => {
+          // HTML要素へのメディアストリームの設定
+          // this.localStream = stream;
+          this.$emit('updateLocalStream', stream);
+        })
+        .catch((error: Error) => {
+          // メディアストリームの取得に失敗⇒古いメディアストリームのまま。チェックボックスの状態を戻す。
+          console.error('Error : ', error);
+          alert('Could not start Camera.');
+          // this.cameraCheckBoxState = false;
+          this.isMicMute = true;
+          return;
+        });
+    },
+    async connectVoiceChannel(channel: types.Channel) {
+      if (
+        !channel.connectingUserIds.some((userId) => userId === this.user._id)
+      ) {
+        const audio = new Audio(joinSound);
+        audio.play();
+
+        navigator.mediaDevices
+          .getUserMedia({ video: false, audio: !this.isMicMute })
+          .then((stream: MediaStream) => {
+            // HTML要素へのメディアストリームの設定
+            // this.localStream = stream;
+            this.$emit('updateLocalStream', stream);
+          })
+          .catch((error: Error) => {
+            // メディアストリームの取得に失敗⇒古いメディアストリームのまま。チェックボックスの状態を戻す。
+            console.error('Error : ', error);
+            alert('Could not start Camera.');
+            // this.cameraCheckBoxState = false;
+            this.isMicMute = true;
+            return;
+          });
+
+        this.currentVoiceChannelId = channel._id;
+
+        // DBのチャンネルデータの同時接続者数を更新
+        await this.$apollo.mutate({
+          mutation: mutations.updateChannel,
+          variables: {
+            name: channel.name,
+            type: channel.type,
+            channelId: channel._id,
+            userId: this.user._id,
+          },
+        });
+
+        if (channel.connectingUserIds.length === 0) {
+          console.log('一人目');
+          offerPeer = new RTCPeerConnection(this.rtcConfiguration);
+
+          this.setupRTCPeerConnectionEventHandler(offerPeer);
+
+          if (this.localStream) {
+            this.localStream.getTracks().forEach((track: any) => {
+              offerPeer.addTrack(track, this.localStream);
+            });
+          } else {
+            console.log('\u001b[31m' + 'No local stream.' + '\u001b[0m');
+          }
+
+          const offer = await offerPeer.createOffer();
+          await offerPeer.setLocalDescription(offer);
+        } else {
+          // 2人目以降なのでofferSDPを受け取る
+          this.$socket.emit('connectVoiceChannel', {
+            userId: this.user._id,
+            channelId: this.currentVoiceChannelId,
+          });
+        }
+      }
+    },
+    setupRTCPeerConnectionEventHandler(rtcPeerConnection: any) {
+      // 収集の状態が変化したら実行されるハンドラ
+      // 収集したICE candidateを保持するSDP
+      rtcPeerConnection.onicegatheringstatechange = () => {
+        console.log('complete' === rtcPeerConnection.iceGatheringState);
+        if ('complete' === rtcPeerConnection.iceGatheringState) {
+          if ('offer' === rtcPeerConnection.localDescription.type) {
+            // OfferSDPをサーバーに送信
+            this.$socket.emit('connectVoiceChannel', {
+              type: 'offer',
+              data: rtcPeerConnection.localDescription,
+              userId: this.user._id,
+              channelId: this.currentVoiceChannelId,
+            });
+          } else if ('answer' === rtcPeerConnection.localDescription.type) {
+            // AnswerSDPをサーバーに送信
+            console.log('- Send AnswerSDP to server');
+            this.$socket.emit('signaling', {
+              type: 'answer',
+              data: rtcPeerConnection.localDescription,
+              channelId: this.currentVoiceChannelId,
+            });
+          } else {
+            console.error(
+              'Unexpected : Unknown localDescription.type. type = ',
+              rtcPeerConnection.localDescription.type
+            );
+          }
+        }
+      };
+
+      rtcPeerConnection.ontrack = (event: any) => {
+        // HTML要素へのリモートメディアストリームの設定
+        const stream = event.streams[0];
+        const track = event.track;
+        if ('video' === track.kind) {
+          this.$emit('setValueToRemoteStreamForVideo', stream);
+        } else if ('audio' === track.kind) {
+          this.$emit('setValueToRemoteStreamForAudio', stream);
+        } else {
+          console.error('Unexpected : Unknown track kind : ', track.kind);
+        }
+      };
+    },
     showChat(channelId: string) {
       this.$emit('showChat', channelId);
     },
@@ -126,7 +609,23 @@ export default Vue.extend({
       this.$emit('goServer');
     },
     hangUp() {
-      this.$emit('hangUp');
+      const audio = new Audio(leaveSound);
+      audio.play();
+
+      this.$apollo.mutate({
+        mutation: mutations.deleteUserFromVoiceChannel,
+        variables: {
+          channelId: this.currentVoiceChannelId,
+          userId: this.user._id,
+        },
+      });
+      this.currentVoiceChannelId = '';
+    },
+    usersExcludingMyself(users: types.User[]) {
+      const filteredUsers = users.filter((user) => {
+        return user._id !== this.user._id;
+      });
+      return filteredUsers;
     },
   },
 });
@@ -173,6 +672,55 @@ export default Vue.extend({
 
 .device-checkbox {
   max-width: 96px;
+}
+
+.category-title {
+  width: 100%;
+}
+
+.server-title {
+  height: 100%;
+  line-height: 50px;
+}
+
+.server-title-row {
+  background: #2f3136;
+}
+
+.participate-or-create-dm {
+  background-color: #2f3136;
+  z-index: 2;
+  -webkit-box-flex: 0;
+  -ms-flex: 0 0 auto;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  height: 100%;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  -webkit-box-shadow: 0 1px 0 rgba(4, 4, 5, 0.2), 0 1.5px 0 rgba(6, 6, 7, 0.05),
+    0 2px 0 rgba(4, 4, 5, 0.05);
+  box-shadow: 0 1px 0 rgba(4, 4, 5, 0.2), 0 1.5px 0 rgba(6, 6, 7, 0.05),
+    0 2px 0 rgba(4, 4, 5, 0.05);
+  display: flex;
+  align-items: center;
+}
+
+.participate-or-create-dm button {
+  width: 100%;
+  height: 28px;
+  overflow: hidden;
+  border-radius: 4px;
+  background-color: #202225;
+  -webkit-box-shadow: none;
+  box-shadow: none;
+  color: #72767d;
+  text-align: left;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 24px;
+  white-space: nowrap;
 }
 </style>
 
