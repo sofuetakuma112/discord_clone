@@ -336,11 +336,11 @@
 <script lang="ts">
 import Vue from 'vue';
 import * as types from '@/types/index.d.ts';
+import * as mutations from '@/graphql/mutation';
 //@ts-ignore
 import joinSound from '@/assets/sounds/join.mp3';
 //@ts-ignore
 import leaveSound from '@/assets/sounds/leave.mp3';
-import * as mutations from '@/graphql/mutation';
 
 interface DataType {
   drawer: any;
@@ -358,7 +358,7 @@ type sdpDataAndType = {
   channelId: string;
 };
 
-let rtcPeerConnection: any;
+const rtcPeerConnections = new Map<string, RTCPeerConnection>();
 
 const black = '\u001b[30m';
 const red = '\u001b[31m';
@@ -409,18 +409,26 @@ export default Vue.extend({
       if ('offer' === objData.type) {
         console.log('offerSDPを受信');
 
-        if (!rtcPeerConnection) {
-          rtcPeerConnection = this.createPeerConnection();
+        if (!rtcPeerConnections.size) {
+          // コネクションオブジェクトが一つも無い
+          const rtcPeerConnection = this.createPeerConnection();
+          rtcPeerConnections.set(this.$socket.id, rtcPeerConnection);
         }
 
-        await rtcPeerConnection.setRemoteDescription(objData.data);
-        const answer = await rtcPeerConnection.createAnswer();
-        await rtcPeerConnection.setLocalDescription(answer);
+        await rtcPeerConnections
+          .get(this.$socket.id)
+          .setRemoteDescription(objData.data);
+        const answer = await rtcPeerConnections
+          .get(this.$socket.id)
+          .createAnswer();
+        await rtcPeerConnections
+          .get(this.$socket.id)
+          .setLocalDescription(answer);
 
         // AnserSDPをリモートへセットする
       } else if ('answer' === objData.type) {
         console.log('answerSDP received!');
-        if (!rtcPeerConnection) {
+        if (!rtcPeerConnections.size) {
           console.log(
             '\u001b[31m' + 'Connection object does not exist.' + '\u001b[0m'
           );
@@ -428,7 +436,9 @@ export default Vue.extend({
         }
 
         // AnswerSDPの設定
-        await rtcPeerConnection.setRemoteDescription(objData.data);
+        await rtcPeerConnections
+          .get(this.$socket.id)
+          .setRemoteDescription(objData.data);
       } else {
         console.error('Unexpected : Socket Event : signaling');
       }
@@ -508,23 +518,25 @@ export default Vue.extend({
       }
 
       // コネクションオブジェクトから古いトラックの削除
-      if (rtcPeerConnection) {
-        console.log('コネクションオブジェクトから古いトラックの削除');
-        // コネクションオブジェクトに対してTrack削除を行う。
-        // （コネクションオブジェクトに対してTrack削除を行わなかった場合、使用していないstream通信が残る。）
-        const senders = rtcPeerConnection.getSenders();
-        senders.forEach((sender: any) => {
-          if (sender.track) {
-            if (
-              idCameraTrack_old === sender.track.id ||
-              idMicrophoneTrack_old === sender.track.id
-            ) {
-              rtcPeerConnection.removeTrack(sender);
-              // removeTrack()の結果として、通信相手に、streamの「removetrack」イベントが発生する。
+      rtcPeerConnections.forEach((rtcPeerConnection) => {
+        if (rtcPeerConnection) {
+          console.log('コネクションオブジェクトから古いトラックの削除');
+          // コネクションオブジェクトに対してTrack削除を行う。
+          // （コネクションオブジェクトに対してTrack削除を行わなかった場合、使用していないstream通信が残る。）
+          const senders = rtcPeerConnection.getSenders();
+          senders.forEach((sender: any) => {
+            if (sender.track) {
+              if (
+                idCameraTrack_old === sender.track.id ||
+                idMicrophoneTrack_old === sender.track.id
+              ) {
+                rtcPeerConnection.removeTrack(sender);
+                // removeTrack()の結果として、通信相手に、streamの「removetrack」イベントが発生する。
+              }
             }
-          }
-        });
-      }
+          });
+        }
+      });
 
       // 古いメディアストリームのトラックの停止（トラックの停止をせず、HTML要素のstreamの解除だけではカメラは停止しない（カメラ動作LEDは点いたまま））
       if (trackCamera_old) {
@@ -554,19 +566,21 @@ export default Vue.extend({
       );
       navigator.mediaDevices
         .getUserMedia({ video: true, audio: bMicrophone_new })
-        .then(async (stream: MediaStream) => {
-          if (rtcPeerConnection) {
+        .then((stream: MediaStream) => {
+          if (rtcPeerConnections.size) {
             console.log('コネクションオブジェクトに対してTrack追加を行う');
-            stream.getTracks().forEach((track) => {
-              rtcPeerConnection.addTrack(track, stream);
+            rtcPeerConnections.forEach(async (rtcPeerConnection) => {
+              stream.getTracks().forEach((track) => {
+                rtcPeerConnection.addTrack(track, stream);
+              });
+
+              // 本来ならここでonnegotiationneededイベントが発行され、
+              // 同イベント内でofferSDPの作成、送信を行うが今回はここで行っている
+
+              // offerSDPの作成、送信
+              const offer = await rtcPeerConnection.createOffer();
+              await rtcPeerConnection.setLocalDescription(offer);
             });
-
-            // 本来ならここでonnegotiationneededイベントが発行され、
-            // 同イベント内でofferSDPの作成、送信を行うが今回はここで行っている
-
-            // offerSDPの作成、送信
-            const offer = await rtcPeerConnection.createOffer();
-            await rtcPeerConnection.setLocalDescription(offer);
           }
           this.localStream = stream;
           console.log('----------------------------------------');
@@ -620,10 +634,15 @@ export default Vue.extend({
           // 一人目は何もしない
         } else {
           // 2人目以降からofferSDPを作成して同じチャンネル内のユーザーに送信する
-          rtcPeerConnection = this.createPeerConnection();
+          const rtcPeerConnection = this.createPeerConnection();
+          rtcPeerConnections.set(this.$socket.id, rtcPeerConnection);
 
-          const offer = await rtcPeerConnection.createOffer();
-          await rtcPeerConnection.setLocalDescription(offer);
+          const offer = await rtcPeerConnections
+            .get(this.$socket.id)
+            .createOffer();
+          await rtcPeerConnections
+            .get(this.$socket.id)
+            .setLocalDescription(offer);
         }
       }
     },
@@ -724,6 +743,7 @@ export default Vue.extend({
         },
       });
       this.currentVoiceChannelId = '';
+      // rtcPeerConnection = null;
     },
     usersExcludingMyself(users: types.User[]) {
       const filteredUsers = users.filter((user) => {
