@@ -7,15 +7,9 @@
       :allData="allData"
       :currentView="currentView"
       :rtcConfiguration="rtcConfiguration"
-      :remoteStreamForVideo="remoteStreamForVideo"
-      :remoteStreamForAudio="remoteStreamForAudio"
-      :localStream="localStream"
       :dms="dms"
       @goServer="currentView = 1"
       @goHome="goHome"
-      @setValueToRemoteStreamForVideo="remoteStreamForVideo = $event"
-      @setValueToRemoteStreamForAudio="remoteStreamForAudio = $event"
-      @updateLocalStream="localStream = $event"
     >
     </LeftSidebar>
     <RightSidebar
@@ -160,9 +154,6 @@ type DataType = {
   audioDeviceLists: types.Device[];
   selectedAudio: string;
   selectedVideo: string;
-  localStream: MediaStream | null;
-  remoteStreamForVideo: MediaStream | null;
-  remoteStreamForAudio: MediaStream | null;
   isMuteVideo: boolean;
   isMuteAudio: boolean;
   peerConnections: any;
@@ -236,9 +227,6 @@ export default Vue.extend({
       isMuteAudio: false,
       isMuteVideo: false,
       peerConnections: {},
-      localStream: null,
-      remoteStreamForVideo: null,
-      remoteStreamForAudio: null,
       cameraCheckBoxState: false,
       audioCheckBoxState: false,
       currentVoiceChannelId: '',
@@ -364,44 +352,6 @@ export default Vue.extend({
         this.videoDeviceLists = videos;
       });
     },
-    // 選択したデバイス or 既定のデバイスを元にMediaStreamを作成
-    // async connectLocalCamera() {
-    //   const constraints = {
-    //     audio: this.selectedAudio
-    //       ? { deviceId: { exact: this.selectedAudio } }
-    //       : true,
-    //     video: this.selectedVideo
-    //       ? { deviceId: { exact: this.selectedVideo } }
-    //       : true,
-    //   };
-
-    //   await navigator.mediaDevices
-    //     .getUserMedia(constraints)
-    //     .then((stream) => {
-    //       localStream = stream;
-    //     })
-    //     .catch((error) => {
-    //       console.error('mediaDevice.getUserMedia() error:', error);
-    //     });
-    // },
-    // muteAudio() {
-    //   if (!localStream) return;
-    //   localStream.getAudioTracks()[0].enabled = !this.isMuteAudio;
-    //   this.isMuteAudio = !this.isMuteAudio;
-    // },
-    // muteVideo() {
-    //   if (!localStream) return;
-    //   if (this.isMuteVideo) {
-    //     // Mute
-    //     localStream.getVideoTracks()[0].stop();
-    //     localStream.removeTrack(localStream.getVideoTracks()[0]);
-    //     // document.getElementById('my-video').srcObject = null;
-    //   } else {
-    //     // Re-connect
-    //     this.connectLocalCamera();
-    //   }
-    //   this.isMuteVideo = !this.isMuteVideo;
-    // },
     goHome() {
       this.currentView = 2;
     },
@@ -522,6 +472,13 @@ export default Vue.extend({
       return booleanStr.toLowerCase() === 'true';
     },
   },
+  beforeRouteEnter(to, from, next) {
+    next((vm) => {
+      console.log(Object.keys(vm.$store.getters.getUser).length === 0);
+      if (Object.keys(vm.$store.getters.getUser).length === 0) next('/login');
+      else next();
+    });
+  },
 });
 </script>
 
@@ -593,6 +550,14 @@ export default Vue.extend({
   height: 22px;
   white-space: nowrap;
   color: #fff;
+}
+
+.video {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  z-index: 50;
+  background-color: #fff;
 }
 </style>
 

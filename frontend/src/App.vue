@@ -25,8 +25,6 @@ export default Vue.extend({
               isAnonymous: result.data.is_anonymous,
               imageConvertedToBase64: result.data.imageConvertedToBase64,
             });
-            if (this.$route.name !== 'Discord')
-              this.$router.push({ name: 'Discord' });
           } else localStorage.removeItem('tokenAndHash');
         });
     }

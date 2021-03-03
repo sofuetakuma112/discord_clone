@@ -37,12 +37,13 @@ io.on('connection', (socket) => {
   // signalingデータ受信時の処理
   socket.on('signaling', (objData) => {
     // 送信元を除く同じチャンネル内のユーザー全てに送信
-    for (const channelAndUserData of userIdsConnectingVoiceChannel) {
-      if (channelAndUserData.channelId === objData.channelId) {
-        // アンサーSDPを送信
-        io.to(channelAndUserData.socketId).emit('signaling', objData);
-      }
-    }
+    // for (const channelAndUserData of userIdsConnectingVoiceChannel) {
+    //   if (channelAndUserData.channelId === objData.channelId) {
+    //     // アンサーSDPを送信
+    //     io.to(channelAndUserData.socketId).emit('signaling', objData);
+    //   }
+    // }
+    socket.broadcast.emit('signaling', objData);
   });
   socket.on('disconnect', () => {
     const userData = userIdsConnectingVoiceChannel.find(
@@ -57,7 +58,7 @@ io.on('connection', (socket) => {
         channel_id: userData.channelId,
         user_id: userData.userId,
       });
-      fetchLatestAllData()
+      fetchLatestAllData();
     }
     userController.deleteAnonymousUser(socket.id);
     console.log(socket.id, 'deleted!');

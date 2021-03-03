@@ -307,22 +307,50 @@
         >
       </div>
     </div>
-    <audio
-      id="audio_remote"
-      :srcObject.prop="remoteStreamForAudio"
-      autoplay
-    ></audio>
+    <div class="video">
+      <video
+        id="video_local"
+        width="320"
+        height="240"
+        style="border: 1px solid black;"
+        autoplay
+        :srcObject.prop="localStream"
+      ></video>
+      <video
+        id="video_remote"
+        width="320"
+        height="240"
+        style="border: 1px solid black;"
+        autoplay
+        :srcObject.prop="remoteStreamForVideo"
+      ></video
+      ><audio
+        id="audio_remote"
+        autoplay
+        :srcObject.prop="remoteStreamForAudio"
+      ></audio>
+    </div>
   </v-navigation-drawer>
 </template>
 
 <script lang="ts">
-import Vue, { PropType } from 'vue';
+import Vue from 'vue';
 import * as types from '@/types/index.d.ts';
 //@ts-ignore
 import joinSound from '@/assets/sounds/join.mp3';
 //@ts-ignore
 import leaveSound from '@/assets/sounds/leave.mp3';
 import * as mutations from '@/graphql/mutation';
+
+interface DataType {
+  drawer: any;
+  isMicMute: boolean;
+  isSpeakerMute: boolean;
+  isSettingOpen: boolean;
+  localStream: MediaStream | null;
+  remoteStreamForVideo: MediaStream | null;
+  remoteStreamForAudio: MediaStream | null;
+}
 
 type sdpDataAndType = {
   type: string;
@@ -332,14 +360,20 @@ type sdpDataAndType = {
 
 let offerPeer: any;
 let answerPeer: any;
+// let localStream: MediaStream | null;
+// let remoteStreamForVideo: MediaStream | null;
+// let remoteStreamForAudio: MediaStream | null;
 
 export default Vue.extend({
-  data() {
+  data(): DataType {
     return {
       drawer: null,
       isMicMute: false,
       isSpeakerMute: false,
       isSettingOpen: false,
+      localStream: null,
+      remoteStreamForVideo: null,
+      remoteStreamForAudio: null,
     };
   },
   props: {
@@ -348,9 +382,6 @@ export default Vue.extend({
     value: String,
     currentView: Number,
     rtcConfiguration: Object,
-    remoteStreamForVideo: MediaStream as PropType<MediaStream | null>,
-    remoteStreamForAudio: MediaStream as PropType<MediaStream | null>,
-    localStream: MediaStream as PropType<MediaStream | null>,
     dms: Array,
   },
   computed: {
@@ -366,15 +397,17 @@ export default Vue.extend({
       },
     },
   },
-  async created() {
+  mounted() {
+    console.log('mounted!');
     this.$socket.on('signaling', async (objData: sdpDataAndType) => {
-      console.log('- type : ', objData.type);
       if ('offer' === objData.type) {
         console.log('offerSDP received!');
 
         answerPeer = new RTCPeerConnection(this.rtcConfiguration);
 
         this.setupRTCPeerConnectionEventHandler(answerPeer);
+
+        console.log(this.localStream);
 
         if (this.localStream) {
           this.localStream.getTracks().forEach((track: any) => {
@@ -390,6 +423,7 @@ export default Vue.extend({
 
         // AnserSDPをリモートへセットする
       } else if ('answer' === objData.type) {
+        console.log('answerSDP received!');
         if (!offerPeer) {
           console.log(
             '\u001b[31m' + 'Connection object does not exist.' + '\u001b[0m'
@@ -409,21 +443,27 @@ export default Vue.extend({
   methods: {
     changeAudioState() {
       this.isMicMute = !this.isMicMute;
-      console.log('UI Event : Camera/Microphone checkbox clicked.');
+
+      const rtcPeerConnection = offerPeer ? offerPeer : answerPeer;
 
       // これまでの状態
       let trackCamera_old = null;
       let trackMicrophone_old = null;
+      let idCameraTrack_old = '';
+      let idMicrophoneTrack_old = '';
+      // 新しい状態
       let bCamera_old = false;
       let bMicrophone_old = false;
       if (this.localStream) {
         trackCamera_old = this.localStream.getVideoTracks()[0];
         if (trackCamera_old) {
           bCamera_old = true;
+          idCameraTrack_old = trackCamera_old.id;
         }
         trackMicrophone_old = this.localStream.getAudioTracks()[0];
         if (trackMicrophone_old) {
           bMicrophone_old = true;
+          idMicrophoneTrack_old = trackMicrophone_old.id;
         }
       }
 
@@ -446,21 +486,40 @@ export default Vue.extend({
         return;
       }
 
+      // コネクションオブジェクトから古いトラックの削除
+      if (rtcPeerConnection) {
+        console.log('コネクションオブジェクトから古いトラックの削除');
+        // コネクションオブジェクトに対してTrack削除を行う。
+        // （コネクションオブジェクトに対してTrack削除を行わなかった場合、使用していないstream通信が残る。）
+        const senders = rtcPeerConnection.getSenders();
+        senders.forEach((sender: any) => {
+          if (sender.track) {
+            if (
+              idCameraTrack_old === sender.track.id ||
+              idMicrophoneTrack_old === sender.track.id
+            ) {
+              rtcPeerConnection.removeTrack(sender);
+              // removeTrack()の結果として、通信相手に、streamの「removetrack」イベントが発生する。
+            }
+          }
+        });
+      }
+
       // 古いメディアストリームのトラックの停止（トラックの停止をせず、HTML要素のstreamの解除だけではカメラは停止しない（カメラ動作LEDは点いたまま））
       if (trackCamera_old) {
         console.log('Call : trackCamera_old.stop()');
         trackCamera_old.stop();
       }
       if (trackMicrophone_old) {
-        console.log('Call : trackMicrophone_old.stop()');
+        console.log('古いメディアストリームのトラックの停止');
         trackMicrophone_old.stop();
       }
       // HTML要素のメディアストリームの解除
-      // this.localStream = null;
-      this.$emit('updateLocalStream', null);
+      this.localStream = null;
 
       if (!bCamera_new && !bMicrophone_new) {
         // （チェックボックスの状態の変化があり、かつ、）カメラとマイクを両方Offの場合
+        console.log('----------------------------------------');
         return;
       }
 
@@ -468,16 +527,23 @@ export default Vue.extend({
       // - 古くは、navigator.getUserMedia() を使用していたが、廃止された。
       //   現在は、navigator.mediaDevices.getUserMedia() が新たに用意され、これを使用する。
       console.log(
-        'Call : navigator.mediaDevices.getUserMedia( video=%s, audio=%s )',
+        'Call : 自分のメディアストリームを取得する ( video=%s, audio=%s )',
         bCamera_new,
         bMicrophone_new
       );
       navigator.mediaDevices
-        .getUserMedia({ video: bCamera_new, audio: bMicrophone_new })
+        .getUserMedia({ video: true, audio: bMicrophone_new })
         .then((stream: MediaStream) => {
-          // HTML要素へのメディアストリームの設定
-          // this.localStream = stream;
-          this.$emit('updateLocalStream', stream);
+          if (rtcPeerConnection) {
+            console.log(
+              'コネクションオブジェクトに対してTrack追加を行う。addTrack()'
+            );
+            stream.getTracks().forEach((track) => {
+              rtcPeerConnection.addTrack(track, stream);
+            });
+          }
+          this.localStream = stream;
+          console.log('----------------------------------------');
         })
         .catch((error: Error) => {
           // メディアストリームの取得に失敗⇒古いメディアストリームのまま。チェックボックスの状態を戻す。
@@ -495,12 +561,11 @@ export default Vue.extend({
         const audio = new Audio(joinSound);
         audio.play();
 
-        navigator.mediaDevices
-          .getUserMedia({ video: false, audio: !this.isMicMute })
+        await navigator.mediaDevices
+          .getUserMedia({ video: true, audio: !this.isMicMute })
           .then((stream: MediaStream) => {
             // HTML要素へのメディアストリームの設定
-            // this.localStream = stream;
-            this.$emit('updateLocalStream', stream);
+            this.localStream = stream;
           })
           .catch((error: Error) => {
             // メディアストリームの取得に失敗⇒古いメディアストリームのまま。チェックボックスの状態を戻す。
@@ -524,8 +589,27 @@ export default Vue.extend({
           },
         });
 
+        // ここからWebRTC関連
         if (channel.connectingUserIds.length === 0) {
-          console.log('一人目');
+          // 一人目は何もしない
+          // offerPeer = new RTCPeerConnection(this.rtcConfiguration);
+          // this.setupRTCPeerConnectionEventHandler(offerPeer);
+          // if (this.localStream) {
+          //   this.localStream.getTracks().forEach((track: any) => {
+          //     offerPeer.addTrack(track, this.localStream);
+          //   });
+          // } else {
+          //   console.log('\u001b[31m' + 'No local stream.' + '\u001b[0m');
+          // }
+          // const offer = await offerPeer.createOffer();
+          // await offerPeer.setLocalDescription(offer);
+        } else {
+          // 2人目以降からofferSDPを作成して同じチャンネル内のユーザーに送信する
+          // this.$socket.emit('connectVoiceChannel', {
+          //   userId: this.user._id,
+          //   channelId: this.currentVoiceChannelId,
+          // });
+
           offerPeer = new RTCPeerConnection(this.rtcConfiguration);
 
           this.setupRTCPeerConnectionEventHandler(offerPeer);
@@ -540,24 +624,25 @@ export default Vue.extend({
 
           const offer = await offerPeer.createOffer();
           await offerPeer.setLocalDescription(offer);
-        } else {
-          // 2人目以降なのでofferSDPを受け取る
-          this.$socket.emit('connectVoiceChannel', {
-            userId: this.user._id,
-            channelId: this.currentVoiceChannelId,
-          });
         }
       }
     },
     setupRTCPeerConnectionEventHandler(rtcPeerConnection: any) {
+      rtcPeerConnection.onnegotiationneeded = () => {
+        // negotiationneededイベントは、
+        // RTCPeerConnectionに送信トラックが追加された後に発生する。
+        // OfferSDPを作成し、相手に送信（このときコネクションオブジェクトは使いまわす）
+        console.log('RTCPeerConnectionにトラックを追加を検知');
+      };
+
       // 収集の状態が変化したら実行されるハンドラ
       // 収集したICE candidateを保持するSDP
       rtcPeerConnection.onicegatheringstatechange = () => {
-        console.log('complete' === rtcPeerConnection.iceGatheringState);
         if ('complete' === rtcPeerConnection.iceGatheringState) {
+          console.log('Ice candidate付きのSDPを送信');
           if ('offer' === rtcPeerConnection.localDescription.type) {
             // OfferSDPをサーバーに送信
-            this.$socket.emit('connectVoiceChannel', {
+            this.$socket.emit('signaling', {
               type: 'offer',
               data: rtcPeerConnection.localDescription,
               userId: this.user._id,
@@ -569,6 +654,7 @@ export default Vue.extend({
             this.$socket.emit('signaling', {
               type: 'answer',
               data: rtcPeerConnection.localDescription,
+              userId: this.user._id,
               channelId: this.currentVoiceChannelId,
             });
           } else {
@@ -585,12 +671,30 @@ export default Vue.extend({
         const stream = event.streams[0];
         const track = event.track;
         if ('video' === track.kind) {
-          this.$emit('setValueToRemoteStreamForVideo', stream);
+          this.remoteStreamForVideo = stream;
         } else if ('audio' === track.kind) {
-          this.$emit('setValueToRemoteStreamForAudio', stream);
+          this.remoteStreamForAudio = stream;
         } else {
           console.error('Unexpected : Unknown track kind : ', track.kind);
         }
+
+        stream.onremovetrack = (event: any) => {
+          // HTML要素のメディアストリームの解除
+          console.log(
+            '相手のトラックが変更されたので古いリモートメディアストリームを破棄する'
+          );
+          const trackRemove = event.track;
+          if ('video' === trackRemove.kind) {
+            this.remoteStreamForVideo = null;
+          } else if ('audio' === trackRemove.kind) {
+            this.remoteStreamForAudio = null;
+          } else {
+            console.error(
+              'Unexpected : Unknown track kind : ',
+              trackRemove.kind
+            );
+          }
+        };
       };
     },
     showChat(channelId: string) {
