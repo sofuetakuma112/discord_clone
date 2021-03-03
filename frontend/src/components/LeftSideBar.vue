@@ -358,11 +358,18 @@ type sdpDataAndType = {
   channelId: string;
 };
 
-let offerPeer: any;
-let answerPeer: any;
-// let localStream: MediaStream | null;
-// let remoteStreamForVideo: MediaStream | null;
-// let remoteStreamForAudio: MediaStream | null;
+let rtcPeerConnection: any;
+
+const black = '\u001b[30m';
+const red = '\u001b[31m';
+const green = '\u001b[32m';
+const yellow = '\u001b[33m';
+const blue = '\u001b[34m';
+const magenta = '\u001b[35m';
+const cyan = '\u001b[36m';
+const white = '\u001b[37m';
+
+const reset = '\u001b[0m';
 
 export default Vue.extend({
   data(): DataType {
@@ -381,7 +388,6 @@ export default Vue.extend({
     allData: Array,
     value: String,
     currentView: Number,
-    rtcConfiguration: Object,
     dms: Array,
   },
   computed: {
@@ -401,50 +407,65 @@ export default Vue.extend({
     console.log('mounted!');
     this.$socket.on('signaling', async (objData: sdpDataAndType) => {
       if ('offer' === objData.type) {
-        console.log('offerSDP received!');
+        console.log('offerSDPを受信');
 
-        answerPeer = new RTCPeerConnection(this.rtcConfiguration);
-
-        this.setupRTCPeerConnectionEventHandler(answerPeer);
-
-        console.log(this.localStream);
-
-        if (this.localStream) {
-          this.localStream.getTracks().forEach((track: any) => {
-            answerPeer.addTrack(track, this.localStream);
-          });
-        } else {
-          console.log('\u001b[31m' + 'No local stream.' + '\u001b[0m');
+        if (!rtcPeerConnection) {
+          rtcPeerConnection = this.createPeerConnection();
         }
 
-        await answerPeer.setRemoteDescription(objData.data);
-        const answer = await answerPeer.createAnswer();
-        await answerPeer.setLocalDescription(answer);
+        await rtcPeerConnection.setRemoteDescription(objData.data);
+        const answer = await rtcPeerConnection.createAnswer();
+        await rtcPeerConnection.setLocalDescription(answer);
 
         // AnserSDPをリモートへセットする
       } else if ('answer' === objData.type) {
         console.log('answerSDP received!');
-        if (!offerPeer) {
+        if (!rtcPeerConnection) {
           console.log(
             '\u001b[31m' + 'Connection object does not exist.' + '\u001b[0m'
           );
           return;
-        } else {
-          console.log('コネクションオブジェクト発見');
         }
 
         // AnswerSDPの設定
-        await offerPeer.setRemoteDescription(objData.data);
+        await rtcPeerConnection.setRemoteDescription(objData.data);
       } else {
         console.error('Unexpected : Socket Event : signaling');
       }
     });
   },
   methods: {
+    createPeerConnection() {
+      const config = {
+        iceServers: [
+          {
+            urls: [
+              'stun:stun.l.google.com:19302',
+              'stun:stun1.l.google.com:19302',
+              'stun:stun2.l.google.com:19302',
+              'stun:stun3.l.google.com:19302',
+              'stun:stun4.l.google.com:19302',
+            ],
+          },
+        ],
+      };
+
+      const rtcPeerConnection = new RTCPeerConnection(config);
+
+      this.setupRTCPeerConnectionEventHandler(rtcPeerConnection);
+
+      if (this.localStream) {
+        this.localStream.getTracks().forEach((track: any) => {
+          rtcPeerConnection.addTrack(track, this.localStream as MediaStream);
+        });
+      } else {
+        console.log('\u001b[31m' + 'No local stream.' + '\u001b[0m');
+      }
+
+      return rtcPeerConnection;
+    },
     changeAudioState() {
       this.isMicMute = !this.isMicMute;
-
-      const rtcPeerConnection = offerPeer ? offerPeer : answerPeer;
 
       // これまでの状態
       let trackCamera_old = null;
@@ -533,14 +554,19 @@ export default Vue.extend({
       );
       navigator.mediaDevices
         .getUserMedia({ video: true, audio: bMicrophone_new })
-        .then((stream: MediaStream) => {
+        .then(async (stream: MediaStream) => {
           if (rtcPeerConnection) {
-            console.log(
-              'コネクションオブジェクトに対してTrack追加を行う。addTrack()'
-            );
+            console.log('コネクションオブジェクトに対してTrack追加を行う');
             stream.getTracks().forEach((track) => {
               rtcPeerConnection.addTrack(track, stream);
             });
+
+            // 本来ならここでonnegotiationneededイベントが発行され、
+            // 同イベント内でofferSDPの作成、送信を行うが今回はここで行っている
+
+            // offerSDPの作成、送信
+            const offer = await rtcPeerConnection.createOffer();
+            await rtcPeerConnection.setLocalDescription(offer);
           }
           this.localStream = stream;
           console.log('----------------------------------------');
@@ -592,56 +618,30 @@ export default Vue.extend({
         // ここからWebRTC関連
         if (channel.connectingUserIds.length === 0) {
           // 一人目は何もしない
-          // offerPeer = new RTCPeerConnection(this.rtcConfiguration);
-          // this.setupRTCPeerConnectionEventHandler(offerPeer);
-          // if (this.localStream) {
-          //   this.localStream.getTracks().forEach((track: any) => {
-          //     offerPeer.addTrack(track, this.localStream);
-          //   });
-          // } else {
-          //   console.log('\u001b[31m' + 'No local stream.' + '\u001b[0m');
-          // }
-          // const offer = await offerPeer.createOffer();
-          // await offerPeer.setLocalDescription(offer);
         } else {
           // 2人目以降からofferSDPを作成して同じチャンネル内のユーザーに送信する
-          // this.$socket.emit('connectVoiceChannel', {
-          //   userId: this.user._id,
-          //   channelId: this.currentVoiceChannelId,
-          // });
+          rtcPeerConnection = this.createPeerConnection();
 
-          offerPeer = new RTCPeerConnection(this.rtcConfiguration);
-
-          this.setupRTCPeerConnectionEventHandler(offerPeer);
-
-          if (this.localStream) {
-            this.localStream.getTracks().forEach((track: any) => {
-              offerPeer.addTrack(track, this.localStream);
-            });
-          } else {
-            console.log('\u001b[31m' + 'No local stream.' + '\u001b[0m');
-          }
-
-          const offer = await offerPeer.createOffer();
-          await offerPeer.setLocalDescription(offer);
+          const offer = await rtcPeerConnection.createOffer();
+          await rtcPeerConnection.setLocalDescription(offer);
         }
       }
     },
     setupRTCPeerConnectionEventHandler(rtcPeerConnection: any) {
       rtcPeerConnection.onnegotiationneeded = () => {
+        // 自分のコネクションオブジェクトのトラックを追加、削除すると実行される
         // negotiationneededイベントは、
         // RTCPeerConnectionに送信トラックが追加された後に発生する。
         // OfferSDPを作成し、相手に送信（このときコネクションオブジェクトは使いまわす）
-        console.log('RTCPeerConnectionにトラックを追加を検知');
+        console.log(red + 'RTCPeerConnectionのトラック変更を検知' + reset);
       };
 
       // 収集の状態が変化したら実行されるハンドラ
       // 収集したICE candidateを保持するSDP
       rtcPeerConnection.onicegatheringstatechange = () => {
         if ('complete' === rtcPeerConnection.iceGatheringState) {
-          console.log('Ice candidate付きのSDPを送信');
           if ('offer' === rtcPeerConnection.localDescription.type) {
-            // OfferSDPをサーバーに送信
+            console.log(blue + 'OfferSDPを送信' + reset);
             this.$socket.emit('signaling', {
               type: 'offer',
               data: rtcPeerConnection.localDescription,
@@ -649,8 +649,7 @@ export default Vue.extend({
               channelId: this.currentVoiceChannelId,
             });
           } else if ('answer' === rtcPeerConnection.localDescription.type) {
-            // AnswerSDPをサーバーに送信
-            console.log('- Send AnswerSDP to server');
+            console.log(blue + 'AnswerSDPを送信', reset);
             this.$socket.emit('signaling', {
               type: 'answer',
               data: rtcPeerConnection.localDescription,
@@ -666,6 +665,7 @@ export default Vue.extend({
         }
       };
 
+      // 通信相手のコネクションオブジェクトにトラックが追加されると発行される
       rtcPeerConnection.ontrack = (event: any) => {
         // HTML要素へのリモートメディアストリームの設定
         const stream = event.streams[0];

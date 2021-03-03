@@ -6,7 +6,6 @@
       :darkBackGround="darkBackGround"
       :allData="allData"
       :currentView="currentView"
-      :rtcConfiguration="rtcConfiguration"
       :dms="dms"
       @goServer="currentView = 1"
       @goHome="goHome"
@@ -160,7 +159,6 @@ type DataType = {
   cameraCheckBoxState: boolean;
   audioCheckBoxState: false;
   currentVoiceChannelId: string;
-  rtcConfiguration: any;
 };
 
 type Image = {
@@ -230,19 +228,6 @@ export default Vue.extend({
       cameraCheckBoxState: false,
       audioCheckBoxState: false,
       currentVoiceChannelId: '',
-      rtcConfiguration: {
-        iceServers: [
-          {
-            urls: [
-              'stun:stun.l.google.com:19302',
-              'stun:stun1.l.google.com:19302',
-              'stun:stun2.l.google.com:19302',
-              'stun:stun3.l.google.com:19302',
-              'stun:stun4.l.google.com:19302',
-            ],
-          },
-        ],
-      },
     };
   },
   computed: {
@@ -302,7 +287,6 @@ export default Vue.extend({
         this.chats = selectedNewDmData.chats;
       }
     });
-
     const allDm = await this.$apollo.query({
       query: queries.dmsQuery,
     });
@@ -471,13 +455,6 @@ export default Vue.extend({
     toBoolean(booleanStr: string): boolean {
       return booleanStr.toLowerCase() === 'true';
     },
-  },
-  beforeRouteEnter(to, from, next) {
-    next((vm) => {
-      console.log(Object.keys(vm.$store.getters.getUser).length === 0);
-      if (Object.keys(vm.$store.getters.getUser).length === 0) next('/login');
-      else next();
-    });
   },
 });
 </script>
