@@ -277,12 +277,7 @@
             >fas fa-microphone-slash</v-icon
           ></v-btn
         >
-        <v-btn
-          icon
-          height="32px"
-          width="32px"
-          @click="isSpeakerMute = !isSpeakerMute"
-        >
+        <v-btn icon height="32px" width="32px" @click="changeSpeakerState">
           <v-icon
             v-if="!isSpeakerMute"
             dark
@@ -309,7 +304,6 @@
     </div>
     <div class="video">
       <video
-        id="video_local"
         width="320"
         height="240"
         style="border: 1px solid black;"
@@ -317,16 +311,18 @@
         :srcObject.prop="localStream"
       ></video>
       <video
-        id="video_remote"
+        v-for="remoteStreamForVideoObject in remoteStreamForVideos"
+        :key="`video_${remoteStreamForVideoObject.socketId}`"
         width="320"
         height="240"
         style="border: 1px solid black;"
         autoplay
-        :srcObject.prop="remoteStreamForVideo"
-      ></video
-      ><audio
-        id="audio_remote"
+        :srcObject.prop="remoteStreamForVideoObject.stream"
+      ></video>
+      <audio
+        v-for="[key, remoteStreamForAudio] in remoteStreamForAudios"
         autoplay
+        :key="`audio_${key}`"
         :srcObject.prop="remoteStreamForAudio"
       ></audio>
     </div>
@@ -338,9 +334,17 @@ import Vue from 'vue';
 import * as types from '@/types/index.d.ts';
 import * as mutations from '@/graphql/mutation';
 //@ts-ignore
-import joinSound from '@/assets/sounds/join.mp3';
+import joinVoiceChannel from '@/assets/sounds/joinVoiceChannel.mp3';
 //@ts-ignore
-import leaveSound from '@/assets/sounds/leave.mp3';
+import leaveVoiceChannel from '@/assets/sounds/leaveVoiceChannel.mp3';
+//@ts-ignore
+import speakerActive from '@/assets/sounds/speakerActive.mp3';
+//@ts-ignore
+import speakerMute from '@/assets/sounds/speakerMute.mp3';
+//@ts-ignore
+import voiceActive from '@/assets/sounds/voiceActive.mp3';
+//@ts-ignore
+import voiceMute from '@/assets/sounds/voiceMute.mp3';
 
 interface DataType {
   drawer: any;
@@ -348,14 +352,15 @@ interface DataType {
   isSpeakerMute: boolean;
   isSettingOpen: boolean;
   localStream: MediaStream | null;
-  remoteStreamForVideo: MediaStream | null;
-  remoteStreamForAudio: MediaStream | null;
+  remoteStreamForVideos: any;
+  remoteStreamForAudios: any;
 }
 
 type sdpDataAndType = {
   type: string;
   data: any;
   channelId: string;
+  from: string;
 };
 
 const rtcPeerConnections = new Map<string, RTCPeerConnection>();
@@ -379,8 +384,8 @@ export default Vue.extend({
       isSpeakerMute: false,
       isSettingOpen: false,
       localStream: null,
-      remoteStreamForVideo: null,
-      remoteStreamForAudio: null,
+      remoteStreamForVideos: [],
+      remoteStreamForAudios: new Map(),
     };
   },
   props: {
@@ -406,46 +411,77 @@ export default Vue.extend({
   mounted() {
     console.log('mounted!');
     this.$socket.on('signaling', async (objData: sdpDataAndType) => {
-      if ('offer' === objData.type) {
-        console.log('offerSDPを受信');
+      const strRemoteSocketID = objData.from;
+      if ('join' === objData.type) {
+        // onclickButton_CreateOfferSDP()、onclickButton_SendOfferSDP()と同様の処理
 
-        if (!rtcPeerConnections.size) {
-          // コネクションオブジェクトが一つも無い
-          const rtcPeerConnection = this.createPeerConnection();
-          rtcPeerConnections.set(this.$socket.id, rtcPeerConnection);
+        if (rtcPeerConnections.get(strRemoteSocketID)) {
+          // 既にコネクションオブジェクトあり
+          alert('Connection object already exists.');
+          return;
         }
 
+        // RTCPeerConnectionオブジェクトの作成
+        console.log('Call : createPeerConnection()');
+        const rtcPeerConnection = this.createPeerConnection(strRemoteSocketID);
+        rtcPeerConnections.set(strRemoteSocketID, rtcPeerConnection);
+
+        const offer = await rtcPeerConnections
+          .get(strRemoteSocketID)!
+          .createOffer();
         await rtcPeerConnections
-          .get(this.$socket.id)
-          .setRemoteDescription(objData.data);
-        const answer = await rtcPeerConnections
-          .get(this.$socket.id)
-          .createAnswer();
-        await rtcPeerConnections
-          .get(this.$socket.id)
-          .setLocalDescription(answer);
+          .get(strRemoteSocketID)!
+          .setLocalDescription(offer);
+
+        // OfferSDPの作成
+      } else if ('offer' === objData.type) {
+        console.log(magenta + 'offerSDPを受信 from ', objData.from, reset);
+        // クライアントがまだコネクションオブジェクトを作成していないなら作成する
+        if (!rtcPeerConnections.has(strRemoteSocketID)) {
+          const rtcPeerConnection = this.createPeerConnection(
+            strRemoteSocketID
+          );
+          rtcPeerConnections.set(strRemoteSocketID, rtcPeerConnection);
+        }
+
+        if (rtcPeerConnections.has(strRemoteSocketID)) {
+          await rtcPeerConnections
+            .get(strRemoteSocketID)!
+            .setRemoteDescription(objData.data);
+
+          const answer = await rtcPeerConnections
+            .get(strRemoteSocketID)!
+            .createAnswer();
+          await rtcPeerConnections
+            .get(strRemoteSocketID)!
+            .setLocalDescription(answer);
+        }
 
         // AnserSDPをリモートへセットする
       } else if ('answer' === objData.type) {
-        console.log('answerSDP received!');
-        if (!rtcPeerConnections.size) {
+        console.log(magenta + 'answerSDPを受信 from ', objData.from, reset);
+        // クライアントがまだコネクションオブジェクトを作成していないなら作成する
+        if (!rtcPeerConnections.has(strRemoteSocketID)) {
           console.log(
-            '\u001b[31m' + 'Connection object does not exist.' + '\u001b[0m'
+            '\u001b[31m' +
+              'コネクションオブジェクトが存在しません' +
+              '\u001b[0m'
           );
           return;
         }
 
-        // AnswerSDPの設定
-        await rtcPeerConnections
-          .get(this.$socket.id)
-          .setRemoteDescription(objData.data);
+        if (rtcPeerConnections.has(strRemoteSocketID)) {
+          await rtcPeerConnections
+            .get(strRemoteSocketID)!
+            .setRemoteDescription(objData.data);
+        }
       } else {
         console.error('Unexpected : Socket Event : signaling');
       }
     });
   },
   methods: {
-    createPeerConnection() {
+    createPeerConnection(strRemoteSocketID: string) {
       const config = {
         iceServers: [
           {
@@ -460,7 +496,9 @@ export default Vue.extend({
         ],
       };
 
-      const rtcPeerConnection = new RTCPeerConnection(config);
+      const rtcPeerConnection: any = new RTCPeerConnection(config);
+
+      rtcPeerConnection.strRemoteSocketID = strRemoteSocketID;
 
       this.setupRTCPeerConnectionEventHandler(rtcPeerConnection);
 
@@ -476,6 +514,11 @@ export default Vue.extend({
     },
     changeAudioState() {
       this.isMicMute = !this.isMicMute;
+
+      const sound = this.isMicMute
+        ? new Audio(voiceMute)
+        : new Audio(voiceActive);
+      sound.play();
 
       // これまでの状態
       let trackCamera_old = null;
@@ -566,21 +609,25 @@ export default Vue.extend({
       );
       navigator.mediaDevices
         .getUserMedia({ video: true, audio: bMicrophone_new })
-        .then((stream: MediaStream) => {
+        .then(async (stream: MediaStream) => {
           if (rtcPeerConnections.size) {
             console.log('コネクションオブジェクトに対してTrack追加を行う');
-            rtcPeerConnections.forEach(async (rtcPeerConnection) => {
-              stream.getTracks().forEach((track) => {
-                rtcPeerConnection.addTrack(track, stream);
-              });
-
-              // 本来ならここでonnegotiationneededイベントが発行され、
-              // 同イベント内でofferSDPの作成、送信を行うが今回はここで行っている
-
-              // offerSDPの作成、送信
-              const offer = await rtcPeerConnection.createOffer();
-              await rtcPeerConnection.setLocalDescription(offer);
-            });
+            await (async () => {
+              for (const [key, rtcPeerConnection] of rtcPeerConnections) {
+                stream.getTracks().forEach((track) => {
+                  rtcPeerConnection.addTrack(track, stream);
+                });
+                // 本来ならここでonnegotiationneededイベントが発行され、
+                // 同イベント内でofferSDPの作成、送信を行うが今回はここで行っている
+                // offerSDPの作成、送信
+                const offer = await rtcPeerConnection.createOffer();
+                console.log(
+                  'コネクションオブジェクトにトラックを追加したので再度offerSDPを送信を試みる',
+                  offer
+                );
+                await rtcPeerConnection.setLocalDescription(offer);
+              }
+            })();
           }
           this.localStream = stream;
           console.log('----------------------------------------');
@@ -598,7 +645,7 @@ export default Vue.extend({
       if (
         !channel.connectingUserIds.some((userId) => userId === this.user._id)
       ) {
-        const audio = new Audio(joinSound);
+        const audio = new Audio(joinVoiceChannel);
         audio.play();
 
         await navigator.mediaDevices
@@ -629,21 +676,10 @@ export default Vue.extend({
           },
         });
 
-        // ここからWebRTC関連
-        if (channel.connectingUserIds.length === 0) {
-          // 一人目は何もしない
-        } else {
-          // 2人目以降からofferSDPを作成して同じチャンネル内のユーザーに送信する
-          const rtcPeerConnection = this.createPeerConnection();
-          rtcPeerConnections.set(this.$socket.id, rtcPeerConnection);
-
-          const offer = await rtcPeerConnections
-            .get(this.$socket.id)
-            .createOffer();
-          await rtcPeerConnections
-            .get(this.$socket.id)
-            .setLocalDescription(offer);
-        }
+        this.$socket.emit('signaling', {
+          type: 'join',
+          from: this.$socket.id,
+        });
       }
     },
     setupRTCPeerConnectionEventHandler(rtcPeerConnection: any) {
@@ -666,6 +702,7 @@ export default Vue.extend({
               data: rtcPeerConnection.localDescription,
               userId: this.user._id,
               channelId: this.currentVoiceChannelId,
+              from: this.$socket.id,
             });
           } else if ('answer' === rtcPeerConnection.localDescription.type) {
             console.log(blue + 'AnswerSDPを送信', reset);
@@ -674,6 +711,7 @@ export default Vue.extend({
               data: rtcPeerConnection.localDescription,
               userId: this.user._id,
               channelId: this.currentVoiceChannelId,
+              from: this.$socket.id,
             });
           } else {
             console.error(
@@ -684,15 +722,54 @@ export default Vue.extend({
         }
       };
 
+      // Connection state change イベントが発生したときのイベントハンドラ
+      // - このイベントは、ピア接続の状態が変化したときに送信される。
+      // 相手のコネクションオブジェクトが破棄されるとConnection state :  disconnectedになる
+      // その後failedになる
+      rtcPeerConnection.onconnectionstatechange = () => {
+        if ('connected' === rtcPeerConnection.connectionState) {
+          console.log('接続完了');
+        }
+        // "disconnected" : 接続のためのICEトランスポートの少なくとも1つが「disconnected」状態であり、
+        //                  他のトランスポートのどれも「failed」、「connecting」、「checking」の状態ではない。
+        // "failed"       : 接続の1つ以上のICEトランスポートが「失敗」状態になっている。
+        // see : https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/connectionState
+
+        if ('failed' === rtcPeerConnection.connectionState) {
+          // 「ビデオチャット相手との通信が切断」が「しばらく」続き、通信が復帰しないとき、Connection state「failed」となる。
+          // - 「ビデオチャット相手との通信が切断」になると「すぐに」Connection state「failed」となるわけではない。
+          // - 相手のチャット離脱後、速やかにコネクション終了処理を行うためには、離脱側からチャット離脱メッセージを送信し、受信側でコネクション終了処理を行うようにする。
+          console.log('endPeerConnection()');
+          this.endPeerConnection(rtcPeerConnection);
+        }
+      };
+
       // 通信相手のコネクションオブジェクトにトラックが追加されると発行される
+      // コネクションオブジェクト毎にontrackが発生するのでそれぞれを一つの変数にまとめて格納したい
+      // オブジェクト型？
       rtcPeerConnection.ontrack = (event: any) => {
-        // HTML要素へのリモートメディアストリームの設定
+        console.log(
+          '相手のコネクションオブジェクトに新たにトラックが追加されたのでDOMに反映する'
+        );
+        const socketId = rtcPeerConnection.strRemoteSocketID;
+        const remoteStreamForVideo = this.remoteStreamForVideos.find(
+          (remoteStreamForVideo: any) =>
+            remoteStreamForVideo.socketId === socketId
+        );
         const stream = event.streams[0];
         const track = event.track;
         if ('video' === track.kind) {
-          this.remoteStreamForVideo = stream;
+          if (remoteStreamForVideo) {
+            remoteStreamForVideo.stream = stream;
+          } else {
+            this.remoteStreamForVideos.push({
+              socketId,
+              stream,
+            });
+          }
         } else if ('audio' === track.kind) {
-          this.remoteStreamForAudio = stream;
+          // this.remoteStreamForAudio = stream;
+          this.remoteStreamForAudios.set(socketId, stream);
         } else {
           console.error('Unexpected : Unknown track kind : ', track.kind);
         }
@@ -704,9 +781,11 @@ export default Vue.extend({
           );
           const trackRemove = event.track;
           if ('video' === trackRemove.kind) {
-            this.remoteStreamForVideo = null;
+            if (remoteStreamForVideo) {
+              remoteStreamForVideo.stream = null;
+            }
           } else if ('audio' === trackRemove.kind) {
-            this.remoteStreamForAudio = null;
+            this.remoteStreamForAudios.set(socketId, null);
           } else {
             console.error(
               'Unexpected : Unknown track kind : ',
@@ -715,6 +794,25 @@ export default Vue.extend({
           }
         };
       };
+    },
+    endPeerConnection(rtcPeerConnection: any) {
+      // リモート映像の停止
+      //console.log( "Call : setStreamToElement( Video_Remote, null )" );
+      //setStreamToElement( g_elementVideoRemote, null );
+      // リモート音声の停止
+      //console.log( "Call : setStreamToElement( Audio_Remote, null )" );
+      //setStreamToElement( g_elementAudioRemote, null );
+      // リモート映像表示用のHTML要素の削除
+      console.log(
+        'this.remoteStreamForAudios, rtcPeerConnectionsから切断したsocketIdと一致するコネクションオブジェクト、ストリームを削除'
+      );
+      this.remoteStreamForAudios.delete(rtcPeerConnection.strRemoteSocketID);
+
+      // グローバル変数Mapから削除
+      rtcPeerConnections.delete(rtcPeerConnection.strRemoteSocketID);
+
+      console.log('ピアコネクションの終了');
+      rtcPeerConnection.close();
     },
     showChat(channelId: string) {
       this.$emit('showChat', channelId);
@@ -731,8 +829,15 @@ export default Vue.extend({
     goServer() {
       this.$emit('goServer');
     },
+    changeSpeakerState() {
+      this.isSpeakerMute = !this.isSpeakerMute;
+      const sound = this.isSpeakerMute
+        ? new Audio(speakerMute)
+        : new Audio(speakerActive);
+      sound.play();
+    },
     hangUp() {
-      const audio = new Audio(leaveSound);
+      const audio = new Audio(leaveVoiceChannel);
       audio.play();
 
       this.$apollo.mutate({
