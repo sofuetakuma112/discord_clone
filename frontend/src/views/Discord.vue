@@ -9,6 +9,9 @@
       :dms="dms"
       @goServer="currentView = 1"
       @goHome="goHome"
+      @createCategoryModal="createCategoryModal = $event"
+      @openAddChannelModal="openAddChannelModal"
+      @showChat="showChat"
     >
     </LeftSidebar>
     <RightSidebar

@@ -63,7 +63,7 @@
               </v-btn>
             </template>
             <v-list class="pa-0">
-              <v-list-item @click="createCategoryModal = true">
+              <v-list-item @click="$emit('createCategoryModal', true)">
                 <v-list-item-title>カテゴリーを新規作成</v-list-item-title>
               </v-list-item>
             </v-list>
@@ -303,7 +303,7 @@
       </div>
     </div>
     <div class="video">
-      <video
+      <!-- <video
         width="320"
         height="240"
         style="border: 1px solid black;"
@@ -318,7 +318,7 @@
         style="border: 1px solid black;"
         autoplay
         :srcObject.prop="remoteStreamForVideoObject.stream"
-      ></video>
+      ></video> -->
       <audio
         v-for="[key, remoteStreamForAudio] in remoteStreamForAudios"
         autoplay
@@ -814,8 +814,8 @@ export default Vue.extend({
       console.log('ピアコネクションの終了');
       rtcPeerConnection.close();
     },
-    showChat(channelId: string) {
-      this.$emit('showChat', channelId);
+    showChat(channelId: string, isSearchInChannel: boolean) {
+      this.$emit('showChat', channelId, isSearchInChannel);
     },
     openAddChannelModal(categoryId: string) {
       this.$emit('openAddChannelModal', categoryId);
@@ -855,6 +855,9 @@ export default Vue.extend({
         return user._id !== this.user._id;
       });
       return filteredUsers;
+    },
+    toBoolean(booleanStr: string): boolean {
+      return booleanStr.toLowerCase() === 'true';
     },
   },
 });
