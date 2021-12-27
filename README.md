@@ -1,23 +1,6 @@
-# setup
-## install mongoDB
-[mongoDB download](https://www.mongodb.com/try/download/community)
+# このリポジトリについて
+Discordのクローンアプリです。
+フロントにVue2, Typescriptを、バックエンドはFastify, TypeScript, MongoDB, GraphQLを使用しています。
 
-install mongoDB
-
-mongod --dbpath discord_clone_db --port 27017
-
-## backend server
-
-cd backend
-
-npm i
-
-npm start
-
-## frontend server
-
-cd frontend
-
-npm i
-
-npm run serve
+# アプリURL
+https://discord-clone-sofue.netlify.app/
