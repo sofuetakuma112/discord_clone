@@ -65,8 +65,6 @@ io.on('connection', (socket) => {
   });
 });
 
-const url = `http://localhost:3000/graphql`;
-
 // Destructure GraphQL functions
 const {
   GraphQLSchema,
@@ -226,6 +224,8 @@ const RootQuery = new GraphQLObjectType({
     },
   },
 });
+
+const url = process.env.GRAPHQL_ENTRY_URI || `http://localhost:5000/graphql`;
 
 // Define Mutations
 // データを変更するために使用する Mutation を宣言します。

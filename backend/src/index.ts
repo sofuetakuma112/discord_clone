@@ -113,11 +113,12 @@ fastify.ready((err) => {
   console.log('server started');
 });
 
-const PORT: any = process.env.PORT || 3000;
+const PORT: any = process.env.PORT || 5000;
+const ADDRESS = process.env.ADDRESS || '0.0.0.0';
 
 const start = async () => {
   try {
-    await fastify.listen(PORT, '0.0.0.0');
+    await fastify.listen(PORT, ADDRESS);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

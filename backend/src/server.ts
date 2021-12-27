@@ -1,6 +1,7 @@
 import fastify, { FastifyInstance } from 'fastify';
 import { Server, IncomingMessage, ServerResponse } from 'http';
 import mongoose from 'mongoose';
+require('dotenv').config();
 
 const server: FastifyInstance<
   Server,
@@ -17,7 +18,7 @@ server.register(require('fastify-cors'), {
 
 // DBサーバーの立ち上げ
 mongoose
-  .connect('mongodb://localhost/discord_clone')
+  .connect(process.env.MONGODB_URI as string)
   .then(() => console.log('MongoDB connected...'))
   .catch((err) => console.log(err));
 
